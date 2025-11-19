@@ -1,0 +1,43 @@
+# Byte-compiled / optimized / DLL files
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Virtual environments
+.venv/
+venv/
+env/
+
+# macOS
+.DS_Store
+
+# PyInstaller
+build/
+dist/
+*.spec
+
+# Logs
+*.log
+
+# IDE / Editor settings
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# Python packaging
+*.egg-info/
+.eggs/
+
+Instructions.md
+Installation.docx
+*Installation.docx*
+setenv.sh
+dbprofiler.log
+dlpxdbprofiler.log
+dbprofiler.spec
+dbprofiler/.envrc
+dbprofiler/.python-version
+
+.python-version
+.envrc
