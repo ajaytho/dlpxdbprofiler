@@ -1,0 +1,275 @@
+name: Build and Release dlpxdbprofiler
+
+permissions:
+  contents: write
+
+on:
+  push:
+    tags:
+      - "v*.*.*"
+
+jobs:
+  # -------------------------------------------------
+  # Matrix build on GitHub-hosted runners
+  #   - ubuntu-latest  -> dlpxdbprofiler-linux-glibc2.38
+  #   - macos-latest   -> dlpxdbprofiler-macos
+  #   - windows-latest -> dlpxdbprofiler-win64.exe
+  # -------------------------------------------------
+  build:
+    name: Build binaries (GitHub-hosted)
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install dependencies
+        shell: bash
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+          pip install pyinstaller
+
+      - name: Build with PyInstaller
+        shell: bash
+        run: |
+          pyinstaller --onefile run_dlpxdbprofiler.py \
+            --name dlpxdbprofiler \
+            --collect-submodules dlpxdbprofiler \
+            --hidden-import=dlpxdbprofiler.db_oracle \
+            --hidden-import decimal \
+            --hidden-import secrets \
+            --hidden-import array \
+            --hidden-import uuid \
+            --hidden-import ssl \
+            --hidden-import socket \
+            --hidden-import select \
+            --hidden-import selectors \
+            --hidden-import hashlib \
+            --hidden-import hmac \
+            --hidden-import base64 \
+            --hidden-import binascii \
+            --hidden-import struct \
+            --hidden-import threading \
+            --hidden-import types \
+            --hidden-import contextlib \
+            --hidden-import collections \
+            --hidden-import datetime \
+            --hidden-import enum \
+            --hidden-import io \
+            --hidden-import os \
+            --hidden-import platform \
+            --hidden-import random \
+            --hidden-import re \
+            --hidden-import string \
+            --hidden-import time \
+            --hidden-import urllib \
+            --hidden-import urllib.parse \
+            --hidden-import zlib \
+            --hidden-import logging \
+            --hidden-import json \
+            --hidden-import math \
+            --hidden-import functools \
+            --hidden-import itertools \
+            --hidden-import typing \
+            --hidden-import inspect \
+            --hidden-import pathlib \
+            --hidden-import tempfile \
+            --hidden-import cryptography \
+            --hidden-import cryptography.hazmat \
+            --hidden-import cryptography.hazmat.primitives \
+            --hidden-import cryptography.hazmat.primitives.kdf \
+            --hidden-import cryptography.hazmat.primitives.kdf.pbkdf2
+
+
+      - name: Rename binary per OS
+        shell: bash
+        run: |
+          mkdir -p artifacts
+          if [ "${{ runner.os }}" = "Windows" ]; then
+            mv dist/dlpxdbprofiler.exe artifacts/dlpxdbprofiler-win64.exe
+          elif [ "${{ runner.os }}" = "macOS" ]; then
+            mv dist/dlpxdbprofiler artifacts/dlpxdbprofiler-macos
+          else
+            # Ubuntu / modern Linux (glibc >= 2.38)
+            mv dist/dlpxdbprofiler artifacts/dlpxdbprofiler-linux-glibc2.38
+          fi
+
+      - name: Upload Windows artifact
+        if: runner.os == 'Windows'
+        uses: actions/upload-artifact@v4
+        with:
+          name: dlpxdbprofiler-win64
+          path: artifacts/dlpxdbprofiler-win64.exe
+
+      - name: Upload macOS artifact
+        if: runner.os == 'macOS'
+        uses: actions/upload-artifact@v4
+        with:
+          name: dlpxdbprofiler-macos
+          path: artifacts/dlpxdbprofiler-macos
+
+      - name: Upload Linux (modern/glibc2.38) artifact
+        if: runner.os == 'Linux'
+        uses: actions/upload-artifact@v4
+        with:
+          name: dlpxdbprofiler-linux-glibc2.38
+          path: artifacts/dlpxdbprofiler-linux-glibc2.38
+
+  # -------------------------------------------------
+  # Portable Linux build (glibc 2.28 baseline)
+  #   - Target: RHEL8/CentOS Stream 8+ (glibc 2.28)
+  #   - Uses manylinux_2_28 + micromamba Python (shared libpython)
+  #   -> dlpxdbprofiler-linux
+  # -------------------------------------------------
+  build-portable-linux:
+    name: Build binary (portable Linux / glibc2.28)
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Build Linux binary (glibc 2.28) using micromamba Python
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          docker run -i --rm \
+            -v "${{ github.workspace }}:/src" \
+            -w /src \
+            quay.io/pypa/manylinux_2_28_x86_64:latest \
+            /bin/bash <<'BASH'
+          set -euo pipefail
+
+          curl -Ls https://micro.mamba.pm/api/micromamba/linux-64/latest | tar -xvj bin/micromamba
+
+          ./bin/micromamba create -y -p /opt/mambaenv -c conda-forge python=3.11 pyinstaller
+
+          ./bin/micromamba run -p /opt/mambaenv python -m pip install -U pip setuptools wheel
+          ./bin/micromamba run -p /opt/mambaenv python -m pip install -r requirements.txt
+
+          # Patch PyInstaller conda hook to tolerate missing "depends" key
+          ./bin/micromamba run -p /opt/mambaenv python - <<'PY'
+          import pathlib, re, sys
+
+          p = pathlib.Path("/opt/mambaenv/lib/python3.11/site-packages/PyInstaller/utils/hooks/conda.py")
+          t = p.read_text()
+
+          # Match both single and double quotes around depends
+          pat = r'for\s+dependency\s+in\s+self\.raw\[(\"|\x27)depends\1\]\s*:'
+          repl = 'for dependency in self.raw.get("depends", []):'
+
+          t2, n = re.subn(pat, repl, t)
+          print("conda.py:", p)
+          if n == 0:
+              print("Patch failed. Showing lines containing 'depends':")
+              for i, line in enumerate(t.splitlines(), start=1):
+                  if "depends" in line:
+                      print(f"{i}: {line}")
+              sys.exit(1)
+
+          p.write_text(t2)
+          print("Patched OK (replacements):", n)
+          PY
+
+          ./bin/micromamba run -p /opt/mambaenv python -m PyInstaller --clean --noconfirm --onefile run_dlpxdbprofiler.py \
+            --name dlpxdbprofiler \
+            --collect-submodules dlpxdbprofiler \
+            --hidden-import=dlpxdbprofiler.db_oracle \
+            --hidden-import decimal \
+            --hidden-import secrets \
+            --hidden-import array \
+            --hidden-import uuid \
+            --hidden-import ssl \
+            --hidden-import socket \
+            --hidden-import select \
+            --hidden-import selectors \
+            --hidden-import hashlib \
+            --hidden-import hmac \
+            --hidden-import base64 \
+            --hidden-import binascii \
+            --hidden-import struct \
+            --hidden-import threading \
+            --hidden-import types \
+            --hidden-import contextlib \
+            --hidden-import collections \
+            --hidden-import datetime \
+            --hidden-import enum \
+            --hidden-import io \
+            --hidden-import os \
+            --hidden-import platform \
+            --hidden-import random \
+            --hidden-import re \
+            --hidden-import string \
+            --hidden-import time \
+            --hidden-import urllib \
+            --hidden-import urllib.parse \
+            --hidden-import zlib \
+            --hidden-import logging \
+            --hidden-import json \
+            --hidden-import math \
+            --hidden-import functools \
+            --hidden-import itertools \
+            --hidden-import typing \
+            --hidden-import inspect \
+            --hidden-import pathlib \
+            --hidden-import tempfile \
+            --hidden-import cryptography \
+            --hidden-import cryptography.hazmat \
+            --hidden-import cryptography.hazmat.primitives \
+            --hidden-import cryptography.hazmat.primitives.kdf \
+            --hidden-import cryptography.hazmat.primitives.kdf.pbkdf2
+
+          mkdir -p /src/artifacts
+          mv /src/dist/dlpxdbprofiler /src/artifacts/dlpxdbprofiler-linux
+          BASH
+          
+          # Host-side check (fails job if file missing)
+          ls -lah artifacts || true
+          test -f artifacts/dlpxdbprofiler-linux
+
+      - name: Upload portable Linux artifact (glibc2.28)
+        uses: actions/upload-artifact@v4
+        with:
+          name: dlpxdbprofiler-linux
+          path: artifacts/dlpxdbprofiler-linux
+
+  # -------------------------------------------------
+  # Release job: creates GitHub Release and attaches
+  # all binaries from all build jobs.
+  # -------------------------------------------------
+  release:
+    name: Create GitHub Release
+    needs:
+      - build
+      - build-portable-linux
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Download all build artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: dist
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            dist/dlpxdbprofiler-linux/dlpxdbprofiler-linux
+            dist/dlpxdbprofiler-linux-glibc2.38/dlpxdbprofiler-linux-glibc2.38
+            dist/dlpxdbprofiler-macos/dlpxdbprofiler-macos
+            dist/dlpxdbprofiler-win64/dlpxdbprofiler-win64.exe
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
