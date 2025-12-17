@@ -100,7 +100,7 @@ jdbc:oracle:thin:@//host:port/service_name
 ⚠️ Note: SID and SERVICE_NAME cannot be set together.
 
 
-# Oracle Thick Client ( If thick client is must. Default thin )
+## Oracle Thick Client ( If thick client is must. Default thin )
 ```
 export DBP_ORACLE_DRIVER_MODE=thick
 export DBP_ORACLE_CLIENT_LIB_DIR="/opt/homebrew/opt/instantclient-basic/lib"
