@@ -25,7 +25,7 @@ This README includes installation instructions, usage examples, environment vari
 - macOS (Intel & Apple Silicon)
 - Windows 64‑bit
 - **No Python required at runtime**  
-- **No Oracle Client required** — uses python-oracledb thin mode
+- **No Oracle Client required** — uses python-oracledb thin mode by default. Thick mode supported via env var.
 
 ### ✔ Supported Databases:
 - **Oracle**
@@ -100,10 +100,15 @@ jdbc:oracle:thin:@//host:port/service_name
 ⚠️ Note: SID and SERVICE_NAME cannot be set together.
 
 
-# Oracle Thick Client ( If thick client is required. Default thin )
+# Oracle Thick Client ( If thick client is must. Default thin )
 ```
 export DBP_ORACLE_DRIVER_MODE=thick
 export DBP_ORACLE_CLIENT_LIB_DIR="/opt/homebrew/opt/instantclient-basic/lib"
+```
+In linux environment you may have to set `LD_LIBRARY_PATH` to point to the Oracle Instant Client lib directory.
+```
+export DBP_ORACLE_CLIENT_LIB_DIR="/path/to/instantclient"
+export LD_LIBRARY_PATH="/path/to/instantclient:$LD_LIBRARY_PATH"
 ```
 
 ## MSSQL DB parameters
