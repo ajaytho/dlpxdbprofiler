@@ -383,6 +383,40 @@ class CEClient:
         self._log(f"MSSQL connector '{name}' created. ID={conn_id}")
         return int(conn_id)
 
+    def create_connector_postgres(
+        self,
+        name: str,
+        env_id: int,
+        host: str,
+        port: int,
+        database_name: str,
+        schema: str,
+        username: str,
+        password: str,
+    ) -> int:
+        self._log(f"Creating PostgreSQL connector '{name}' ...")
+        payload = {
+            "connectorName": name,
+            "databaseType": "POSTGRES",
+            "environmentId": env_id,
+            "databaseName": database_name,
+            "host": host,
+            "port": port,
+            "schemaName": schema,
+            "username": username,
+            "password": password,
+            "kerberosAuth": False,
+            "jdbcDriverId": 5,
+            "enableLogger": False,
+            "passwordVaultAuth": False,
+        }
+        data = self._request("POST", "/database-connectors", json_body=payload)
+        conn_id = data.get("databaseConnectorId")
+        if conn_id is None:
+            self._error(f"Failed to create PostgreSQL connector '{name}': {data}")
+        self._log(f"PostgreSQL connector '{name}' created. ID={conn_id}")
+        return int(conn_id)
+
     # ------------- rulesets & tables -------------
 
     def create_ruleset(self, connector_id: int, schema: str) -> int:

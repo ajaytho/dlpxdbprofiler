@@ -51,10 +51,12 @@ if __package__:
     from .ce_client import CEClient, CEError
     from .db_oracle import OracleDB, OracleDBError
     from .db_mssql import MSSQLDB, MSSQLDBError
+    from .db_postgres import PostgresDB, PostgresDBError
 else:
     from ce_client import CEClient, CEError
     from db_oracle import OracleDB, OracleDBError
     from db_mssql import MSSQLDB, MSSQLDBError
+    from db_postgres import PostgresDB, PostgresDBError
 
 # Disable SSL warnings for verify=False (like curl -k)
 requests.packages.urllib3.disable_warnings(InsecureRequestWarning)
@@ -77,6 +79,16 @@ class MSSQLConfig:
     host: str = ""
     port: int = 1433
     database: str = ""
+    username: str = ""
+    password: str = ""
+
+
+@dataclass
+class PostgresConfig:
+    host: str = ""
+    port: int = 5432
+    database: str = ""
+    schema: str = "public"
     username: str = ""
     password: str = ""
 
@@ -364,15 +376,87 @@ def prepare_mssql_config(logger: logging.Logger) -> MSSQLConfig:
     )
 
 
+def prepare_postgres_config(logger: logging.Logger) -> PostgresConfig:
+    host = get_value_from_env_or_prompt(
+        name="PostgreSQL host",
+        env_var="DBP_POSTGRES_HOST",
+        prompt="PostgreSQL host",
+        logger=logger,
+    )
+
+    port_str = get_value_from_env_or_prompt(
+        name="PostgreSQL port",
+        env_var="DBP_POSTGRES_PORT",
+        prompt="PostgreSQL port",
+        default="5432",
+        logger=logger,
+    )
+
+    database = get_value_from_env_or_prompt(
+        name="PostgreSQL database name",
+        env_var="DBP_POSTGRES_DATABASE",
+        prompt="PostgreSQL database name",
+        logger=logger,
+    )
+
+    schema = get_value_from_env_or_prompt(
+        name="PostgreSQL schema name",
+        env_var="DBP_POSTGRES_SCHEMA",
+        prompt="PostgreSQL schema name",
+        default="public",
+        logger=logger,
+    )
+
+    username = get_value_from_env_or_prompt(
+        name="PostgreSQL connector username",
+        env_var="DBP_POSTGRES_USER",
+        prompt="PostgreSQL connector username",
+        logger=logger,
+    )
+
+    password = get_value_from_env_or_prompt(
+        name="PostgreSQL connector user password",
+        env_var="DBP_POSTGRES_PASSWORD",
+        prompt="PostgreSQL connector user password",
+        secret=True,
+        logger=logger,
+    )
+
+    try:
+        port = int(port_str)
+    except ValueError:
+        logger.error("Port must be an integer.")
+        raise
+
+    logger.info(f"DB host: {host}")
+    logger.info(f"DB port: {port}")
+    logger.info(f"DB database: {database}")
+    logger.info(f"DB schema: {schema}")
+    logger.info(f"DB connector user: {username}")
+
+    return PostgresConfig(
+        host=host,
+        port=port,
+        database=database,
+        schema=schema,
+        username=username,
+        password=password,
+    )
+
+
 
 def choose_db_engine(logger: logging.Logger) -> str:
     print("Select database engine:")
     print("  1) Oracle")
     print("  2) MSSQL")
-    choice = input("Enter choice [1-2]: ").strip()
+    print("  3) Postgres")
+    choice = input("Enter choice [1-3]: ").strip()
     if choice == "2":
         logger.info("DB engine: MSSQL")
         return "MSSQL"
+    elif choice == "3":
+        logger.info("DB engine: POSTGRES")
+        return "POSTGRES"
     logger.info("DB engine: Oracle")
     return "ORACLE"
 
@@ -417,15 +501,30 @@ def choose_profile_run_scope(logger: logging.Logger) -> str:
 
 def op_create_application(logger: logging.Logger):
     ce = prepare_ce_client(logger)
-    app_name = prompt_non_empty("Application name")
+    app_name = get_value_from_env_or_prompt(
+        name="Application name",
+        env_var="DBP_APPLICATION_NAME",
+        prompt="Application name",
+        logger=logger,
+    )
     logger.info("Application operation selected.")
     ce.ensure_application(app_name)
 
 
 def op_create_environment(logger: logging.Logger):
     ce = prepare_ce_client(logger)
-    app_name = prompt_non_empty("Application name")
-    env_name = prompt_non_empty("Environment name")
+    app_name = get_value_from_env_or_prompt(
+        name="Application name",
+        env_var="DBP_APPLICATION_NAME",
+        prompt="Application name",
+        logger=logger,
+    )
+    env_name = get_value_from_env_or_prompt(
+        name="Environment name",
+        env_var="DBP_ENVIRONMENT_NAME",
+        prompt="Environment name",
+        logger=logger,
+    )
 
     logger.info("Environment operation selected.")
     app_id = ce.ensure_application(app_name)
@@ -462,7 +561,20 @@ def _create_connectors_for_engine(
         # Common identifier string for JDBC URL
         oracle_identifier = oracle_cfg.service_name or oracle_cfg.sid
 
-        schemas = oracle_db.list_schemas()
+        try:
+            schemas = oracle_db.list_schemas()
+        except Exception as e:
+            logger.error(
+                f"Failed to connect to Oracle database. Please verify:\n"
+                f"  - Host and port are correct and accessible\n"
+                f"  - Database credentials are valid\n"
+                f"  - Network connectivity (firewall, VPN, etc.)\n"
+                f"  - Oracle service is running\n"
+                f"  - SID/Service Name is correct\n"
+                f"Error: {e}"
+            )
+            return
+
         if connector_scope == "SCHEMA":
             schema_name = prompt_non_empty("Schema name to use for connector").upper()
             if schema_name not in schemas:
@@ -537,7 +649,19 @@ def _create_connectors_for_engine(
             logger=logger,
         )
 
-        schemas = mssql_db.list_schemas()
+        try:
+            schemas = mssql_db.list_schemas()
+        except Exception as e:
+            logger.error(
+                f"Failed to connect to MSSQL database. Please verify:\n"
+                f"  - Host and port are correct and accessible\n"
+                f"  - Database credentials are valid\n"
+                f"  - Network connectivity (firewall, VPN, etc.)\n"
+                f"  - MSSQL service is running\n"
+                f"Error: {e}"
+            )
+            return
+
         if connector_scope == "SCHEMA":
             schema_name = prompt_non_empty("Schema name to use for connector")
             if schema_name not in schemas:
@@ -581,11 +705,89 @@ def _create_connectors_for_engine(
             ce.bulk_add_tables_to_ruleset(ruleset_id, tables)
             ce.create_profile_job(ruleset_id, schema, profile_set_id)
 
+    elif db_engine == "POSTGRES":
+        postgres_cfg = prepare_postgres_config(logger)
+        postgres_db = PostgresDB(
+            host=postgres_cfg.host,
+            port=postgres_cfg.port,
+            database=postgres_cfg.database,
+            schema=postgres_cfg.schema,
+            username=postgres_cfg.username,
+            password=postgres_cfg.password,
+            logger=logger,
+        )
+
+        try:
+            schemas = postgres_db.list_schemas()
+        except Exception as e:
+            logger.error(
+                f"Failed to connect to PostgreSQL database. Please verify:\n"
+                f"  - Host and port are correct and accessible\n"
+                f"  - Database credentials are valid\n"
+                f"  - Network connectivity (firewall, VPN, etc.)\n"
+                f"  - PostgreSQL service is running\n"
+                f"Error: {e}"
+            )
+            return
+
+        if connector_scope == "SCHEMA":
+            schema_name = prompt_non_empty("Schema name to use for connector")
+            if schema_name not in schemas:
+                logger.error(f"Schema {schema_name} not found in database.")
+                return
+            schemas = [schema_name]
+
+        for schema in schemas:
+            connector_name = f"CONNECTOR_{schema}"
+            logger.info(
+                f"Processing PostgreSQL connector {connector_name} for schema {schema}"
+            )
+            existing_id = ce.find_connector_by_name(env_id, connector_name)
+            if existing_id is not None:
+                logger.info(
+                    f"Connector '{connector_name}' already exists (ID={existing_id}). "
+                    f"Will still create ruleset/profile job."
+                )
+                connector_id = existing_id
+            else:
+                connector_id = ce.create_connector_postgres(
+                    name=connector_name,
+                    env_id=env_id,
+                    host=postgres_cfg.host,
+                    port=postgres_cfg.port,
+                    database_name=postgres_cfg.database,
+                    schema=schema,
+                    username=postgres_cfg.username,
+                    password=postgres_cfg.password,
+                )
+
+            if connector_id is None:
+                logger.info(
+                    f"Skipping ruleset/profile creation for schema {schema} "
+                    f"due to missing connector id."
+                )
+                continue
+
+            ruleset_id = ce.create_ruleset(connector_id, schema)
+            tables = postgres_db.list_tables_for_schema(schema)
+            ce.bulk_add_tables_to_ruleset(ruleset_id, tables)
+            ce.create_profile_job(ruleset_id, schema, profile_set_id)
+
 
 def op_create_connectors(logger: logging.Logger, include_app_env_text: bool):
     ce = prepare_ce_client(logger)
-    app_name = prompt_non_empty("Application name")
-    env_name = prompt_non_empty("Environment name")
+    app_name = get_value_from_env_or_prompt(
+        name="Application name",
+        env_var="DBP_APPLICATION_NAME",
+        prompt="Application name",
+        logger=logger,
+    )
+    env_name = get_value_from_env_or_prompt(
+        name="Environment name",
+        env_var="DBP_ENVIRONMENT_NAME",
+        prompt="Environment name",
+        logger=logger,
+    )
     #profile_set_id_str = prompt_non_empty("Profile Set ID", default="20")
     profile_set_id_str = get_value_from_env_or_prompt(
         name="Profile Set ID",
@@ -661,12 +863,23 @@ def op_list_schemas(logger: logging.Logger):
             password=cfg.password,
             logger=logger,
         )
-    else:
+    elif db_engine == "MSSQL":
         cfg = prepare_mssql_config(logger)
         db = MSSQLDB(
             host=cfg.host,
             port=cfg.port,
             database=cfg.database,
+            username=cfg.username,
+            password=cfg.password,
+            logger=logger,
+        )
+    else:  # POSTGRES
+        cfg = prepare_postgres_config(logger)
+        db = PostgresDB(
+            host=cfg.host,
+            port=cfg.port,
+            database=cfg.database,
+            schema=cfg.schema,
             username=cfg.username,
             password=cfg.password,
             logger=logger,
@@ -808,8 +1021,18 @@ def _run_profile_jobs_parallel(
 
 def op_run_profile_jobs(logger: logging.Logger):
     ce = prepare_ce_client(logger)
-    app_name = prompt_non_empty("Application name")
-    env_name = prompt_non_empty("Environment name")
+    app_name = get_value_from_env_or_prompt(
+        name="Application name",
+        env_var="DBP_APPLICATION_NAME",
+        prompt="Application name",
+        logger=logger,
+    )
+    env_name = get_value_from_env_or_prompt(
+        name="Environment name",
+        env_var="DBP_ENVIRONMENT_NAME",
+        prompt="Environment name",
+        logger=logger,
+    )
 
     logger.info("Run profile jobs (single/all) operation selected.")
     app_id = ce.ensure_application(app_name)

@@ -2,7 +2,7 @@
 # dlpxdbprofiler
 
 `dlpxdbprofiler` is a standalone CLI utility designed to automate profiling across an entire database for the **Delphix Continuous Compliance Engine (Masking Engine)**.
-It supports Oracle & MSSQL databases and performs:
+It supports Oracle, MSSQL, and PostgreSQL databases and performs:
 
 - Application creation
 - Environment creation
@@ -25,11 +25,13 @@ This README includes installation instructions, usage examples, environment vari
 - macOS (Intel & Apple Silicon)
 - Windows 64‑bit
 - **No Python required at runtime**  
-- **No Oracle Client required** — uses python-oracledb thin mode by default. Thick mode supported via env var.
+- **No Oracle Client required** — uses python-oracledb thin mode by default. 
+  - Thick mode supported via env var. Oracle Client must be installed separately. Instant Client supported.
 
 ### ✔ Supported Databases:
 - **Oracle**
 - **MSSQL**
+- **PostgreSQL**
 
 ---
 
@@ -64,6 +66,13 @@ export DBP_CE_USERNAME="admin"
 export DBP_CE_PASSWORD="xxxxxx"
 export DBP_CE_API_VERSION=v5.1.45
 ```
+
+## Application and Environment (Optional)
+```
+export DBP_APPLICATION_NAME="Digital Bank CRM"
+export DBP_ENVIRONMENT_NAME="Digital Bank CRM MASK"
+```
+⚠️ Note: If not set, you will be prompted to enter these values interactively.
 
 ## Oracle DB parameters
 dlpxdbprofiler supports both SID and SERVICE_NAME, and they are mutually exclusive:  
@@ -100,7 +109,7 @@ jdbc:oracle:thin:@//host:port/service_name
 ⚠️ Note: SID and SERVICE_NAME cannot be set together.
 
 
-## Oracle Thick Client ( If thick client is must. Default thin )
+## Oracle Thick Client ( If thick client is required. )
 ```
 export DBP_ORACLE_DRIVER_MODE=thick
 export DBP_ORACLE_CLIENT_LIB_DIR="/opt/homebrew/opt/instantclient-basic/lib"
@@ -119,6 +128,22 @@ export DBP_MSSQL_DATABASE="suitecrm-dev"
 export DBP_MSSQL_USER="delphixdb"
 export DBP_MSSQL_PASSWORD="xxxxxx"
 ```
+
+## PostgreSQL DB parameters
+```
+export DBP_POSTGRES_HOST="10.10.10.10"
+export DBP_POSTGRES_PORT="5432"
+export DBP_POSTGRES_DATABASE="digitalbank"
+export DBP_POSTGRES_SCHEMA="public"
+export DBP_POSTGRES_USER="postgres"
+export DBP_POSTGRES_PASSWORD="xxxxxx"
+```
+
+### PostgreSQL Connection Timeout (Optional)
+```
+export DBP_POSTGRES_CONNECT_TIMEOUT=60    # Connection timeout in seconds (default: 30)
+```
+⚠️ Note: If you experience connection timeouts due to network latency or firewall issues, increase this value.
 
 ## Profile Set
 ```
@@ -164,7 +189,7 @@ You can enter options and follow prompts.
 
 ---
 
-# ⚡ Parallel Execution of Profile Jobs (NEW)
+# ⚡ Parallel Execution of Profile Jobs
 
 dlpxdbprofiler supports **parallel execution** of profile jobs.
 
@@ -264,6 +289,49 @@ Select option: 5
 ```
 Select option: 6
 ```
+
+---
+
+# 🔧 Troubleshooting
+
+## Database Connection Timeout Errors
+
+If you encounter connection timeout errors like:
+```
+Failed to connect to PostgreSQL postgres@10.160.1.74:5444/digitalbank: 
+connection to server at "10.160.1.74", port 5444 failed: timeout expired
+```
+
+### Common Causes and Solutions:
+
+1. **Network Connectivity Issues**
+   - Verify the database host/IP is reachable: `ping <host>`
+   - Check if the port is accessible: `telnet <host> <port>` or `nc -zv <host> <port>`
+   - Ensure there are no firewall rules blocking the connection
+   - If using VPN, ensure it's connected
+
+2. **Incorrect Database Credentials**
+   - Double-check the hostname, port, database name, and schema
+   - Verify username and password are correct
+   - Test connection using a database client (psql, sqlplus, etc.)
+
+3. **Database Service Not Running**
+   - Verify the database service is running on the target server
+   - Check database logs for any issues
+
+4. **Increase Connection Timeout**
+   - For PostgreSQL, set a longer timeout:
+     ```bash
+     export DBP_POSTGRES_CONNECT_TIMEOUT=60  # 60 seconds
+     ```
+   - Default timeout is 30 seconds
+
+### Error Handling
+
+The application now provides helpful error messages when connection fails:
+- Lists common troubleshooting steps
+- Returns gracefully without crashing
+- Allows you to re-run with corrected settings
 
 ---
 

@@ -1,4 +1,5 @@
 requests
 oracledb
 python-tds
+psycopg2-binary
 dataclasses; python_version < "3.7"
