@@ -582,6 +582,33 @@ def choose_connector_scope(logger: logging.Logger) -> str:
 
 
 def choose_oracle_connector_type(logger: logging.Logger) -> str:
+    """
+    Choose Oracle connector type (NATIVE or JDBC).
+    Can be set via environment variable DBP_ORACLE_CONNECTOR_TYPE.
+
+    Supported values:
+      - NATIVE, 1: Native (host/port/sid) - default
+      - JDBC, 2: JDBC (jdbc:oracle:thin:@//host:port/SID)
+    """
+    env_value = os.environ.get("DBP_ORACLE_CONNECTOR_TYPE", "").strip().upper()
+
+    if env_value:
+        logger.info(f"Oracle connector type loaded from environment variable DBP_ORACLE_CONNECTOR_TYPE: {env_value}")
+
+        if env_value in ("JDBC", "2"):
+            logger.info("Oracle connector type: JDBC")
+            return "JDBC"
+        elif env_value in ("NATIVE", "1"):
+            logger.info("Oracle connector type: NATIVE")
+            return "NATIVE"
+        else:
+            logger.warning(
+                f"Invalid DBP_ORACLE_CONNECTOR_TYPE value '{env_value}'. "
+                "Expected: NATIVE, JDBC, 1, or 2. Prompting for input..."
+            )
+    else:
+        logger.info("Oracle connector type not found in environment variable DBP_ORACLE_CONNECTOR_TYPE, prompting...")
+
     print("Oracle connector type:")
     print("  1) Native (host/port/sid)")
     print("  2) JDBC (jdbc:oracle:thin:@//host:port/SID)")

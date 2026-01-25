@@ -91,6 +91,21 @@ export DBP_ORACLE_DRIVER_MODE="thick"
 export DBP_ORACLE_CLIENT_LIB_DIR="/opt/homebrew/opt/instantclient-basic/lib"
 ```
 
+### Oracle Connector Type (Optional)
+
+**NEW!** Set this to avoid the interactive prompt for connector type selection:
+
+```bash
+# Oracle Connector Type Selection
+# Values: NATIVE (default), JDBC (or 1, 2)
+export DBP_ORACLE_CONNECTOR_TYPE="NATIVE"
+```
+
+⚠️ **Note:** If not set, you will be prompted to select the connector type interactively.
+
+- **NATIVE** (or `1`): Uses native connector format `host/port/sid`
+- **JDBC** (or `2`): Uses JDBC URL format `jdbc:oracle:thin:@//host:port/SID`
+
 ### Oracle Cryptography Settings
 
 **Note:** The application automatically sets `CRYPTOGRAPHY_OPENSSL_NO_LEGACY=1` to ensure compatibility with OpenSSL 3.x. This is handled internally and does not need to be set manually unless you want to override the default behavior.
@@ -225,6 +240,9 @@ export DBP_ORACLE_SERVICE_NAME="HRPROD"
 export DBP_ORACLE_USER="hr_admin"
 export DBP_ORACLE_PASSWORD="xxxxxxxx"
 
+# Optional: Oracle connector type (NEW!)
+export DBP_ORACLE_CONNECTOR_TYPE="NATIVE"
+
 # Optional: Enable parallel profile job execution
 export DBP_PROFILE_MAX_PARALLEL=5
 
@@ -354,6 +372,7 @@ When you set environment variables:
 | `DBP_ORACLE_PASSWORD` | Conditional | - | Oracle password |
 | `DBP_ORACLE_DRIVER_MODE` | No | thin | Oracle driver mode (thin/thick) |
 | `DBP_ORACLE_CLIENT_LIB_DIR` | No | - | Oracle client library directory |
+| `DBP_ORACLE_CONNECTOR_TYPE` | No | NATIVE | Oracle connector type (NATIVE/1 or JDBC/2) |
 | `DBP_MSSQL_HOST` | Conditional | - | MSSQL host |
 | `DBP_MSSQL_PORT` | Conditional | - | MSSQL port |
 | `DBP_MSSQL_DATABASE` | Conditional | - | MSSQL database |
