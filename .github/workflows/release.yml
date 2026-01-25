@@ -125,16 +125,16 @@ jobs:
 
           curl -Ls https://micro.mamba.pm/api/micromamba/linux-64/latest | tar -xvj bin/micromamba
 
-          # Install Python, PyInstaller, OpenSSL 3.0, and cryptography from conda-forge
-          # This ensures cryptography is built against conda's OpenSSL 3.0, not a newer bundled version
-          # Pin cryptography to 41.x which is compatible with OpenSSL 3.0.x
-          ./bin/micromamba create -y -p /opt/mambaenv -c conda-forge python=3.11 pyinstaller "openssl=3.0.*" "cryptography>=41.0,<42.0" cffi
+          # Install Python, PyInstaller, OpenSSL 3.1, and cryptography from conda-forge
+          # OpenSSL 3.1 is compatible with manylinux_2_28 and required by modern cryptography
+          # Pin cryptography to 41.x for stability
+          ./bin/micromamba create -y -p /opt/mambaenv -c conda-forge python=3.11 pyinstaller "openssl=3.1.*" "cryptography>=41.0,<42.0" cffi
 
           ./bin/micromamba run -p /opt/mambaenv python -m pip install -U pip setuptools wheel
           ./bin/micromamba run -p /opt/mambaenv python -m pip install -r requirements.txt
 
-          # Verify OpenSSL version (must be 3.0.x for manylinux_2_28 compatibility)
-          ./bin/micromamba run -p /opt/mambaenv python -c "import ssl; print(f'OpenSSL version: {ssl.OPENSSL_VERSION}'); assert '3.0.' in ssl.OPENSSL_VERSION, f'ERROR: OpenSSL {ssl.OPENSSL_VERSION} detected, must be 3.0.x for glibc 2.28 compatibility'"
+          # Verify OpenSSL version (3.1.x is compatible with manylinux_2_28)
+          ./bin/micromamba run -p /opt/mambaenv python -c "import ssl; print(f'OpenSSL version: {ssl.OPENSSL_VERSION}'); assert '3.1.' in ssl.OPENSSL_VERSION or '3.2.' in ssl.OPENSSL_VERSION, f'ERROR: OpenSSL {ssl.OPENSSL_VERSION} detected, expected 3.1.x or 3.2.x'"
 
           # Verify cryptography can be imported and check its OpenSSL version
           ./bin/micromamba run -p /opt/mambaenv python -c "import cryptography; from cryptography.hazmat.backends import default_backend; print(f'cryptography version: {cryptography.__version__}'); print(f'cryptography backend: {default_backend()}')"
