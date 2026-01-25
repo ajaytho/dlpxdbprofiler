@@ -5,7 +5,7 @@ This hook ensures that all cryptography submodules and backends are
 properly included in the PyInstaller binary.
 """
 
-from PyInstaller.utils.hooks import collect_submodules, collect_data_files
+from PyInstaller.utils.hooks import collect_submodules, collect_data_files, collect_dynamic_libs
 
 # Collect all cryptography submodules
 hiddenimports = collect_submodules('cryptography')
@@ -28,3 +28,8 @@ hiddenimports += [
 
 # Collect any data files and binaries
 datas = collect_data_files('cryptography')
+
+# Collect dynamic libraries (shared objects)
+binaries = collect_dynamic_libs('cryptography')
+
+
