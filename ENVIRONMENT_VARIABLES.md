@@ -91,6 +91,16 @@ export DBP_ORACLE_DRIVER_MODE="thick"
 export DBP_ORACLE_CLIENT_LIB_DIR="/opt/homebrew/opt/instantclient-basic/lib"
 ```
 
+### Oracle Cryptography Settings
+
+**Note:** The application automatically sets `CRYPTOGRAPHY_OPENSSL_NO_LEGACY=1` to ensure compatibility with OpenSSL 3.x. This is handled internally and does not need to be set manually unless you want to override the default behavior.
+
+```bash
+# Only set this if you need to explicitly control legacy algorithm support
+# Default: 1 (legacy algorithms disabled)
+# export CRYPTOGRAPHY_OPENSSL_NO_LEGACY=1
+```
+
 ---
 
 ## MSSQL Database Configuration

@@ -14,6 +14,10 @@ import logging
 from typing import List
 import os
 
+# Set environment variable to avoid OpenSSL legacy provider errors
+# This must be set before importing oracledb/cryptography
+os.environ.setdefault('CRYPTOGRAPHY_OPENSSL_NO_LEGACY', '1')
+
 import oracledb
 
 
