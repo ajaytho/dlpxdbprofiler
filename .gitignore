@@ -14,7 +14,6 @@ env/
 # PyInstaller
 build/
 dist/
-*.spec
 
 # Logs
 *.log
@@ -35,9 +34,8 @@ Installation.docx
 setenv.sh
 dbprofiler.log
 dlpxdbprofiler.log
-dbprofiler.spec
-dbprofiler/.envrc
-dbprofiler/.python-version
+dlpxdbprofiler/.envrc
+dlpxdbprofiler/.python-version
 
 .python-version
 .envrc
