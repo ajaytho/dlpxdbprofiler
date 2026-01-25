@@ -181,6 +181,7 @@ class OracleDB:
             "WMSYS",
             "XDB",
             "XS$NULL",
+            "OPS$ORACLE"
         }
 
         sql = """

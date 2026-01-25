@@ -52,11 +52,13 @@ if __package__:
     from .db_oracle import OracleDB, OracleDBError
     from .db_mssql import MSSQLDB, MSSQLDBError
     from .db_postgres import PostgresDB, PostgresDBError
+    from .db_mysql import MySQLDB, MySQLDBError
 else:
     from ce_client import CEClient, CEError
     from db_oracle import OracleDB, OracleDBError
     from db_mssql import MSSQLDB, MSSQLDBError
     from db_postgres import PostgresDB, PostgresDBError
+    from db_mysql import MySQLDB, MySQLDBError
 
 # Disable SSL warnings for verify=False (like curl -k)
 requests.packages.urllib3.disable_warnings(InsecureRequestWarning)
@@ -89,6 +91,15 @@ class PostgresConfig:
     port: int = 5432
     database: str = ""
     schema: str = "public"
+    username: str = ""
+    password: str = ""
+
+
+@dataclass
+class MySQLConfig:
+    host: str = ""
+    port: int = 3306
+    database: str = ""
     username: str = ""
     password: str = ""
 
@@ -444,19 +455,80 @@ def prepare_postgres_config(logger: logging.Logger) -> PostgresConfig:
     )
 
 
+def prepare_mysql_config(logger: logging.Logger) -> MySQLConfig:
+    host = get_value_from_env_or_prompt(
+        name="MySQL host",
+        env_var="DBP_MYSQL_HOST",
+        prompt="MySQL host",
+        logger=logger,
+    )
+
+    port_str = get_value_from_env_or_prompt(
+        name="MySQL port",
+        env_var="DBP_MYSQL_PORT",
+        prompt="MySQL port",
+        default="3306",
+        logger=logger,
+    )
+
+    database = get_value_from_env_or_prompt(
+        name="MySQL database name",
+        env_var="DBP_MYSQL_DATABASE",
+        prompt="MySQL database name",
+        logger=logger,
+    )
+
+    username = get_value_from_env_or_prompt(
+        name="MySQL connector username",
+        env_var="DBP_MYSQL_USER",
+        prompt="MySQL connector username",
+        logger=logger,
+    )
+
+    password = get_value_from_env_or_prompt(
+        name="MySQL connector user password",
+        env_var="DBP_MYSQL_PASSWORD",
+        prompt="MySQL connector user password",
+        secret=True,
+        logger=logger,
+    )
+
+    try:
+        port = int(port_str)
+    except ValueError:
+        logger.error("Port must be an integer.")
+        raise
+
+    logger.info(f"DB host: {host}")
+    logger.info(f"DB port: {port}")
+    logger.info(f"DB database: {database}")
+    logger.info(f"DB connector user: {username}")
+
+    return MySQLConfig(
+        host=host,
+        port=port,
+        database=database,
+        username=username,
+        password=password,
+    )
+
 
 def choose_db_engine(logger: logging.Logger) -> str:
     print("Select database engine:")
     print("  1) Oracle")
     print("  2) MSSQL")
     print("  3) Postgres")
-    choice = input("Enter choice [1-3]: ").strip()
+    print("  4) MySQL")
+    choice = input("Enter choice [1-4]: ").strip()
     if choice == "2":
         logger.info("DB engine: MSSQL")
         return "MSSQL"
     elif choice == "3":
         logger.info("DB engine: POSTGRES")
         return "POSTGRES"
+    elif choice == "4":
+        logger.info("DB engine: MYSQL")
+        return "MYSQL"
     logger.info("DB engine: Oracle")
     return "ORACLE"
 
@@ -773,6 +845,65 @@ def _create_connectors_for_engine(
             ce.bulk_add_tables_to_ruleset(ruleset_id, tables)
             ce.create_profile_job(ruleset_id, schema, profile_set_id)
 
+    elif db_engine == "MYSQL":
+        mysql_cfg = prepare_mysql_config(logger)
+        mysql_db = MySQLDB(
+            host=mysql_cfg.host,
+            port=mysql_cfg.port,
+            database=mysql_cfg.database,
+            username=mysql_cfg.username,
+            password=mysql_cfg.password,
+            logger=logger,
+        )
+
+        try:
+            tables = mysql_db.list_tables()
+        except Exception as e:
+            logger.error(
+                f"Failed to connect to MySQL database. Please verify:\n"
+                f"  - Host and port are correct and accessible\n"
+                f"  - Database credentials are valid\n"
+                f"  - Network connectivity (firewall, VPN, etc.)\n"
+                f"  - MySQL service is running\n"
+                f"Error: {e}"
+            )
+            return
+
+        # MySQL doesn't use schemas in the same way as MSSQL/Postgres
+        # We create a single connector for the database
+        connector_name = f"CONNECTOR_{mysql_cfg.database}"
+        logger.info(
+            f"Processing MySQL connector {connector_name} for database {mysql_cfg.database}"
+        )
+        existing_id = ce.find_connector_by_name(env_id, connector_name)
+        if existing_id is not None:
+            logger.info(
+                f"Connector '{connector_name}' already exists (ID={existing_id}). "
+                f"Will still create ruleset/profile job."
+            )
+            connector_id = existing_id
+        else:
+            connector_id = ce.create_connector_mysql(
+                name=connector_name,
+                env_id=env_id,
+                host=mysql_cfg.host,
+                port=mysql_cfg.port,
+                database_name=mysql_cfg.database,
+                username=mysql_cfg.username,
+                password=mysql_cfg.password,
+            )
+
+        if connector_id is None:
+            logger.info(
+                f"Skipping ruleset/profile creation for database {mysql_cfg.database} "
+                f"due to missing connector id."
+            )
+            return
+
+        ruleset_id = ce.create_ruleset(connector_id, mysql_cfg.database)
+        ce.bulk_add_tables_to_ruleset(ruleset_id, tables)
+        ce.create_profile_job(ruleset_id, mysql_cfg.database, profile_set_id)
+
 
 def op_create_connectors(logger: logging.Logger, include_app_env_text: bool):
     ce = prepare_ce_client(logger)
@@ -873,7 +1004,7 @@ def op_list_schemas(logger: logging.Logger):
             password=cfg.password,
             logger=logger,
         )
-    else:  # POSTGRES
+    elif db_engine == "POSTGRES":
         cfg = prepare_postgres_config(logger)
         db = PostgresDB(
             host=cfg.host,
@@ -884,13 +1015,36 @@ def op_list_schemas(logger: logging.Logger):
             password=cfg.password,
             logger=logger,
         )
+    elif db_engine == "MYSQL":
+        cfg = prepare_mysql_config(logger)
+        db = MySQLDB(
+            host=cfg.host,
+            port=cfg.port,
+            database=cfg.database,
+            username=cfg.username,
+            password=cfg.password,
+            logger=logger,
+        )
+    else:
+        logger.error(f"Unsupported database engine: {db_engine}")
+        return
 
     logger.info("List all schemas operation selected.")
-    schemas = db.list_schemas()
-    print(f"{'SCHEMA_NAME':<25}")
-    print(f"{'-' * 11:<25}")
-    for s in schemas:
-        print(f"{s:<25}")
+    if db_engine == "MYSQL":
+        # MySQL doesn't have schemas like PostgreSQL/MSSQL
+        # List tables instead
+        logger.info("MySQL uses databases, not schemas. Listing tables in database...")
+        tables = db.list_tables()
+        print(f"{'TABLE_NAME':<40}")
+        print(f"{'-' * 10:<40}")
+        for t in tables:
+            print(f"{t:<40}")
+    else:
+        schemas = db.list_schemas()
+        print(f"{'SCHEMA_NAME':<25}")
+        print(f"{'-' * 11:<25}")
+        for s in schemas:
+            print(f"{s:<25}")
 
 
 def op_list_profile_sets(logger: logging.Logger):
@@ -1262,7 +1416,7 @@ def main():
                 break
             else:
                 print("Invalid choice.")
-        except (CEError, OracleDBError, MSSQLDBError, ValueError) as e:
+        except (CEError, OracleDBError, MSSQLDBError, PostgresDBError, MySQLDBError, ValueError) as e:
             logger.error(f"Operation failed: {e}")
 
 

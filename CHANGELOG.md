@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [1.2.0] - 2025-01-24
+
+### Added
+
+- Added support for MySQL database.
+
+---
+
 ## [1.1.0] - 2025-01-21
 
 ### Added
@@ -20,4 +28,5 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 
 - Initial public release of `dlpxdbprofiler`.
+- Added support for Oracle & MSSQL database.
 

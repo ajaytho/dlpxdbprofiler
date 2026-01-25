@@ -1,6 +1,6 @@
 # Complete Environment Variables Reference
 
-This document provides a comprehensive list of all environment variables supported by `dlpxdbprofiler` for fully automated, non-interactive operation.
+This document provides a comprehensive list of all environment variables supported by `dlpxdbprofiler` for automated, non-interactive operation.
 
 ---
 
@@ -32,7 +32,7 @@ export DBP_ENVIRONMENT_NAME="Digital Bank CRM MASK"
 
 ## Profile Set Configuration
 
-Optional - Defaults to 20 if not set:
+Optional - Defaults to 4 if not set:
 
 ```bash
 export DBP_PROFILE_SET_ID=4
@@ -51,6 +51,7 @@ export DBP_ORACLE_PORT="1521"
 export DBP_ORACLE_SID="ORCL"
 export DBP_ORACLE_USER="hr"
 export DBP_ORACLE_PASSWORD="xxxxxx"
+unset DBP_ORACLE_SERVICE_NAME
 ```
 
 ### Option 2: Using SERVICE_NAME
@@ -60,6 +61,7 @@ export DBP_ORACLE_PORT="1521"
 export DBP_ORACLE_SERVICE_NAME="appservice"
 export DBP_ORACLE_USER="hr"
 export DBP_ORACLE_PASSWORD="xxxxxx"
+unset DBP_ORACLE_SID
 ```
 
 ⚠️ **Important:** SID and SERVICE_NAME are mutually exclusive. Set only one.
@@ -93,16 +95,23 @@ export DBP_POSTGRES_DATABASE="digitalbank"
 export DBP_POSTGRES_SCHEMA="public"
 export DBP_POSTGRES_USER="postgres"
 export DBP_POSTGRES_PASSWORD="xxxxxx"
-```
-
-### PostgreSQL Connection Timeout (Optional)
-**NEW!** Control connection timeout for slow networks:
-
-```bash
 export DBP_POSTGRES_CONNECT_TIMEOUT=60  # Default: 30 seconds
 ```
 
 ⚠️ **Note:** Increase this value if you experience connection timeouts due to network latency or firewall issues.
+
+---
+
+## MySQL Database Configuration
+
+```bash
+export DBP_MYSQL_HOST="10.10.10.10"
+export DBP_MYSQL_PORT="3306"
+export DBP_MYSQL_DATABASE="delphixdb"
+export DBP_MYSQL_USER="root"
+export DBP_MYSQL_PASSWORD="xxxxxx"
+export DBP_MYSQL_CONNECT_TIMEOUT=60  # Default: 30 seconds
+```
 
 ---
 
@@ -122,20 +131,20 @@ export DBP_PROFILE_MAX_PARALLEL=3  # Default: 1 (serial execution)
 #!/bin/bash
 
 # Compliance Engine
-export DBP_CE_BASE_URL="http://uvo1ex5yozzx8l4494d.vm.cld.sr"
+export DBP_CE_BASE_URL="http://ajaytcc.example.com"
 export DBP_CE_USERNAME="admin"
-export DBP_CE_PASSWORD="MySecurePassword123"
+export DBP_CE_PASSWORD="xxxxxxxx"
 export DBP_CE_API_VERSION="v5.1.46"
 
 # Application and Environment (NEW!)
-export DBP_APPLICATION_NAME="Digital Bank CRM"
-export DBP_ENVIRONMENT_NAME="Digital Bank CRM MASK"
+export DBP_APPLICATION_NAME="Demo_CRM_App"
+export DBP_ENVIRONMENT_NAME="Demo_CRM_Env"
 
 # Profile Set
 export DBP_PROFILE_SET_ID=4
 
 # PostgreSQL Database
-export DBP_POSTGRES_HOST="10.160.1.74"
+export DBP_POSTGRES_HOST="postgres.example.com"
 export DBP_POSTGRES_PORT="5432"
 export DBP_POSTGRES_DATABASE="digitalbank"
 export DBP_POSTGRES_SCHEMA="public"
@@ -160,24 +169,24 @@ export DBP_PROFILE_MAX_PARALLEL=3
 #!/bin/bash
 
 # Compliance Engine
-export DBP_CE_BASE_URL="http://your-mask-engine"
+export DBP_CE_BASE_URL="http://ajaytcc.example.com"
 export DBP_CE_USERNAME="admin"
-export DBP_CE_PASSWORD="admin_password"
+export DBP_CE_PASSWORD="xxxxxxxx"
 export DBP_CE_API_VERSION="v5.1.46"
 
 # Application and Environment (NEW!)
-export DBP_APPLICATION_NAME="HR Application"
-export DBP_ENVIRONMENT_NAME="HR Production"
+export DBP_APPLICATION_NAME="Demo_CRM_App"
+export DBP_ENVIRONMENT_NAME="Demo_CRM_Env"
 
 # Profile Set
-export DBP_PROFILE_SET_ID=20
+export DBP_PROFILE_SET_ID=4
 
 # Oracle Database (using SERVICE_NAME)
 export DBP_ORACLE_HOST="oracle.example.com"
 export DBP_ORACLE_PORT="1521"
 export DBP_ORACLE_SERVICE_NAME="HRPROD"
 export DBP_ORACLE_USER="hr_admin"
-export DBP_ORACLE_PASSWORD="oracle_password"
+export DBP_ORACLE_PASSWORD="xxxxxxxx"
 
 # Optional: Enable parallel profile job execution
 export DBP_PROFILE_MAX_PARALLEL=5
@@ -194,14 +203,14 @@ export DBP_PROFILE_MAX_PARALLEL=5
 #!/bin/bash
 
 # Compliance Engine
-export DBP_CE_BASE_URL="http://your-mask-engine"
+export DBP_CE_BASE_URL="http://ajaytcc.example.com"
 export DBP_CE_USERNAME="admin"
-export DBP_CE_PASSWORD="admin_password"
+export DBP_CE_PASSWORD="xxxxxxxx"
 export DBP_CE_API_VERSION="v5.1.46"
 
 # Application and Environment (NEW!)
-export DBP_APPLICATION_NAME="CRM System"
-export DBP_ENVIRONMENT_NAME="CRM UAT"
+export DBP_APPLICATION_NAME="Demo_CRM_App"
+export DBP_ENVIRONMENT_NAME="Demo_CRM_Env"
 
 # Profile Set
 export DBP_PROFILE_SET_ID=4
@@ -211,7 +220,44 @@ export DBP_MSSQL_HOST="mssql.example.com"
 export DBP_MSSQL_PORT="1433"
 export DBP_MSSQL_DATABASE="CRM_UAT"
 export DBP_MSSQL_USER="crm_user"
-export DBP_MSSQL_PASSWORD="mssql_password"
+export DBP_MSSQL_PASSWORD="xxxxxxxx"
+
+# Optional: Enable parallel profile job execution
+export DBP_PROFILE_MAX_PARALLEL=2
+
+# Run the profiler
+./dlpxdbprofiler
+```
+
+---
+
+## Complete Example: Fully Non-Interactive MySQL Setup
+
+```bash
+#!/bin/bash
+
+# Compliance Engine
+export DBP_CE_BASE_URL="http://ajaytcc.example.com"
+export DBP_CE_USERNAME="admin"
+export DBP_CE_PASSWORD="xxxxxxxx"
+export DBP_CE_API_VERSION="v5.1.46"
+
+# Application and Environment (NEW!)
+export DBP_APPLICATION_NAME="Demo_CRM_App"
+export DBP_ENVIRONMENT_NAME="Demo_CRM_Env"
+
+# Profile Set
+export DBP_PROFILE_SET_ID=4
+
+# MySQL Database
+export DBP_MYSQL_HOST="mysql.example.com"
+export DBP_MYSQL_PORT="3306"
+export DBP_MYSQL_DATABASE="delphixdb"
+export DBP_MYSQL_USER="root"
+export DBP_MYSQL_PASSWORD="xxxxxxxx"
+
+# Optional: Increase timeout for slow networks
+export DBP_MYSQL_CONNECT_TIMEOUT=60
 
 # Optional: Enable parallel profile job execution
 export DBP_PROFILE_MAX_PARALLEL=2
@@ -273,6 +319,12 @@ When you set environment variables:
 | `DBP_POSTGRES_USER` | Conditional | - | PostgreSQL username |
 | `DBP_POSTGRES_PASSWORD` | Conditional | - | PostgreSQL password |
 | `DBP_POSTGRES_CONNECT_TIMEOUT` | No | 30 | PostgreSQL connection timeout (seconds) |
+| `DBP_MYSQL_HOST` | Conditional | - | MySQL host |
+| `DBP_MYSQL_PORT` | Conditional | 3306 | MySQL port |
+| `DBP_MYSQL_DATABASE` | Conditional | - | MySQL database |
+| `DBP_MYSQL_USER` | Conditional | - | MySQL username |
+| `DBP_MYSQL_PASSWORD` | Conditional | - | MySQL password |
+| `DBP_MYSQL_CONNECT_TIMEOUT` | No | 30 | MySQL connection timeout (seconds) |
 | `DBP_PROFILE_MAX_PARALLEL` | No | 1 | Parallel profile job execution (1=serial) |
 
 **Conditional:** Required when selecting that specific database engine.

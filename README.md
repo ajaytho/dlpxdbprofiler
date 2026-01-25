@@ -2,7 +2,7 @@
 # dlpxdbprofiler
 
 `dlpxdbprofiler` is a standalone CLI utility designed to automate profiling across an entire database for the **Delphix Continuous Compliance Engine (Masking Engine)**.
-It supports Oracle, MSSQL, and PostgreSQL databases and performs:
+It supports Oracle, MSSQL, PostgreSQL, and MySQL databases and performs:
 
 - Application creation
 - Environment creation
@@ -26,12 +26,13 @@ This README includes installation instructions, usage examples, environment vari
 - Windows 64‑bit
 - **No Python required at runtime**  
 - **No Oracle Client required** — uses python-oracledb thin mode by default. 
-  - Thick mode supported via env var. Oracle Client must be installed separately. Instant Client supported.
+  - Thick mode supported via env var. Oracle Client must be installed separately. Oracle Instant Client supported.
 
 ### ✔ Supported Databases:
 - **Oracle**
 - **MSSQL**
 - **PostgreSQL**
+- **MySQL**
 
 ---
 
@@ -144,6 +145,20 @@ export DBP_POSTGRES_PASSWORD="xxxxxx"
 export DBP_POSTGRES_CONNECT_TIMEOUT=60    # Connection timeout in seconds (default: 30)
 ```
 ⚠️ Note: If you experience connection timeouts due to network latency or firewall issues, increase this value.
+
+## MySQL DB parameters
+```
+export DBP_MYSQL_HOST="10.10.10.10"
+export DBP_MYSQL_PORT="3306"
+export DBP_MYSQL_DATABASE="delphixdb"
+export DBP_MYSQL_USER="root"
+export DBP_MYSQL_PASSWORD="xxxxxx"
+```
+
+### MySQL Connection Timeout (Optional)
+```
+export DBP_MYSQL_CONNECT_TIMEOUT=60    # Connection timeout in seconds (default: 30)
+```
 
 ## Profile Set
 ```
