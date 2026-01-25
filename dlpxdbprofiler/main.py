@@ -514,6 +514,27 @@ def prepare_mysql_config(logger: logging.Logger) -> MySQLConfig:
 
 
 def choose_db_engine(logger: logging.Logger) -> str:
+    # Check for environment variable first
+    env_value = os.getenv("DBP_DB_ENGINE")
+    if env_value:
+        env_value_upper = env_value.strip().upper()
+        # Support both full names and numeric choices
+        if env_value_upper in ["ORACLE", "1"]:
+            logger.info(f"DB engine loaded from environment variable DBP_DB_ENGINE: ORACLE")
+            return "ORACLE"
+        elif env_value_upper in ["MSSQL", "2"]:
+            logger.info(f"DB engine loaded from environment variable DBP_DB_ENGINE: MSSQL")
+            return "MSSQL"
+        elif env_value_upper in ["POSTGRES", "POSTGRESQL", "3"]:
+            logger.info(f"DB engine loaded from environment variable DBP_DB_ENGINE: POSTGRES")
+            return "POSTGRES"
+        elif env_value_upper in ["MYSQL", "4"]:
+            logger.info(f"DB engine loaded from environment variable DBP_DB_ENGINE: MYSQL")
+            return "MYSQL"
+        else:
+            logger.warning(f"Invalid DBP_DB_ENGINE value '{env_value}'. Falling back to interactive prompt.")
+
+    # Interactive prompt if no valid environment variable
     print("Select database engine:")
     print("  1) Oracle")
     print("  2) MSSQL")
@@ -534,6 +555,21 @@ def choose_db_engine(logger: logging.Logger) -> str:
 
 
 def choose_connector_scope(logger: logging.Logger) -> str:
+    # Check for environment variable first
+    env_value = os.getenv("DBP_CONNECTOR_SCOPE")
+    if env_value:
+        env_value_upper = env_value.strip().upper()
+        # Support various formats: SCHEMA, SINGLE, 1 or DB, ALL, DATABASE, 2
+        if env_value_upper in ["SCHEMA", "SINGLE", "1"]:
+            logger.info(f"Connector scope loaded from environment variable DBP_CONNECTOR_SCOPE: single schema")
+            return "SCHEMA"
+        elif env_value_upper in ["DB", "ALL", "DATABASE", "2"]:
+            logger.info(f"Connector scope loaded from environment variable DBP_CONNECTOR_SCOPE: all schemas in database")
+            return "DB"
+        else:
+            logger.warning(f"Invalid DBP_CONNECTOR_SCOPE value '{env_value}'. Falling back to interactive prompt.")
+
+    # Interactive prompt if no valid environment variable
     print("Connector creation scope:")
     print("  1) Single schema only")
     print("  2) All schemas in database (default)")

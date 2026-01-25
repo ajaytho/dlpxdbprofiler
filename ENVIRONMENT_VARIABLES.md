@@ -30,6 +30,25 @@ export DBP_ENVIRONMENT_NAME="Digital Bank CRM MASK"
 
 ---
 
+## Database Engine and Connector Scope Configuration
+
+**NEW!** Optional - Set these to make the tool fully non-interactive:
+
+```bash
+# Database Engine Selection
+# Values: ORACLE, MSSQL, POSTGRES, MYSQL (or 1, 2, 3, 4)
+export DBP_DB_ENGINE="MYSQL"
+
+# Connector Scope Selection
+# Values: SCHEMA (single schema) or DB/ALL (all schemas)
+# Can also use: 1 (single) or 2 (all)
+export DBP_CONNECTOR_SCOPE="ALL"
+```
+
+⚠️ **Note:** If not set, you will be prompted to select these values interactively.
+
+---
+
 ## Profile Set Configuration
 
 Optional - Defaults to 4 if not set:
@@ -140,6 +159,10 @@ export DBP_CE_API_VERSION="v5.1.46"
 export DBP_APPLICATION_NAME="Demo_CRM_App"
 export DBP_ENVIRONMENT_NAME="Demo_CRM_Env"
 
+# Database Engine and Connector Scope (NEW!)
+export DBP_DB_ENGINE="POSTGRES"
+export DBP_CONNECTOR_SCOPE="ALL"
+
 # Profile Set
 export DBP_PROFILE_SET_ID=4
 
@@ -178,6 +201,10 @@ export DBP_CE_API_VERSION="v5.1.46"
 export DBP_APPLICATION_NAME="Demo_CRM_App"
 export DBP_ENVIRONMENT_NAME="Demo_CRM_Env"
 
+# Database Engine and Connector Scope (NEW!)
+export DBP_DB_ENGINE="ORACLE"
+export DBP_CONNECTOR_SCOPE="ALL"
+
 # Profile Set
 export DBP_PROFILE_SET_ID=4
 
@@ -212,6 +239,10 @@ export DBP_CE_API_VERSION="v5.1.46"
 export DBP_APPLICATION_NAME="Demo_CRM_App"
 export DBP_ENVIRONMENT_NAME="Demo_CRM_Env"
 
+# Database Engine and Connector Scope (NEW!)
+export DBP_DB_ENGINE="MSSQL"
+export DBP_CONNECTOR_SCOPE="ALL"
+
 # Profile Set
 export DBP_PROFILE_SET_ID=4
 
@@ -245,6 +276,10 @@ export DBP_CE_API_VERSION="v5.1.46"
 # Application and Environment (NEW!)
 export DBP_APPLICATION_NAME="Demo_CRM_App"
 export DBP_ENVIRONMENT_NAME="Demo_CRM_Env"
+
+# Database Engine and Connector Scope (NEW!)
+export DBP_DB_ENGINE="MYSQL"
+export DBP_CONNECTOR_SCOPE="ALL"
 
 # Profile Set
 export DBP_PROFILE_SET_ID=4
@@ -298,6 +333,8 @@ When you set environment variables:
 | `DBP_CE_API_VERSION` | Yes | - | CE API version |
 | `DBP_APPLICATION_NAME` | No | (prompt) | Application name |
 | `DBP_ENVIRONMENT_NAME` | No | (prompt) | Environment name |
+| `DBP_DB_ENGINE` | No | (prompt) | Database engine (ORACLE, MSSQL, POSTGRES, MYSQL or 1-4) |
+| `DBP_CONNECTOR_SCOPE` | No | (prompt) | Connector scope (SCHEMA/SINGLE/1 or DB/ALL/2) |
 | `DBP_PROFILE_SET_ID` | No | 20 | Profile set ID |
 | `DBP_ORACLE_HOST` | Conditional | - | Oracle host |
 | `DBP_ORACLE_PORT` | Conditional | - | Oracle port |
