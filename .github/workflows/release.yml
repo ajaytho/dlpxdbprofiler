@@ -127,8 +127,8 @@ jobs:
 
           # Install Python, PyInstaller, OpenSSL 3.0, and cryptography from conda-forge
           # This ensures cryptography is built against conda's OpenSSL 3.0, not a newer bundled version
-          # Pin cryptography to 42.x which is compatible with OpenSSL 3.0.x (not 3.3.x)
-          ./bin/micromamba create -y -p /opt/mambaenv -c conda-forge python=3.11 pyinstaller "openssl=3.0.*" "cryptography>=42.0,<43.0" cffi
+          # Pin cryptography to 41.x which is compatible with OpenSSL 3.0.x
+          ./bin/micromamba create -y -p /opt/mambaenv -c conda-forge python=3.11 pyinstaller "openssl=3.0.*" "cryptography>=41.0,<42.0" cffi
 
           ./bin/micromamba run -p /opt/mambaenv python -m pip install -U pip setuptools wheel
           ./bin/micromamba run -p /opt/mambaenv python -m pip install -r requirements.txt
