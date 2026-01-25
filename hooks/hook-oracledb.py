@@ -10,5 +10,9 @@ from PyInstaller.utils.hooks import collect_submodules, collect_data_files
 # Collect all oracledb submodules
 hiddenimports = collect_submodules('oracledb')
 
+# Add cryptography as a hidden import - required by oracledb thin mode
+hiddenimports += collect_submodules('cryptography')
+hiddenimports += ['cryptography.hazmat.primitives.ciphers.aead']
+
 # Collect any data files
 datas = collect_data_files('oracledb')
