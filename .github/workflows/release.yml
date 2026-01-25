@@ -125,10 +125,15 @@ jobs:
 
           curl -Ls https://micro.mamba.pm/api/micromamba/linux-64/latest | tar -xvj bin/micromamba
 
-          ./bin/micromamba create -y -p /opt/mambaenv -c conda-forge python=3.11 pyinstaller
+          # Install Python, PyInstaller, OpenSSL 3.0, and cryptography from conda-forge
+          # This ensures cryptography is built against conda's OpenSSL 3.0, not a newer bundled version
+          ./bin/micromamba create -y -p /opt/mambaenv -c conda-forge python=3.11 pyinstaller "openssl=3.0.*" "cryptography<46.0"
 
           ./bin/micromamba run -p /opt/mambaenv python -m pip install -U pip setuptools wheel
           ./bin/micromamba run -p /opt/mambaenv python -m pip install -r requirements.txt
+
+          # Verify OpenSSL version (must be 3.0.x for manylinux_2_28 compatibility)
+          ./bin/micromamba run -p /opt/mambaenv python -c "import ssl; print(f'OpenSSL version: {ssl.OPENSSL_VERSION}'); assert '3.0.' in ssl.OPENSSL_VERSION, f'ERROR: OpenSSL {ssl.OPENSSL_VERSION} detected, must be 3.0.x for glibc 2.28 compatibility'"
 
           # Verify oracledb version (must be <2.0 for CentOS 7 compatibility)
           ./bin/micromamba run -p /opt/mambaenv python -c "import oracledb; print(f'oracledb version: {oracledb.__version__}'); assert oracledb.__version__.startswith('1.'), f'ERROR: oracledb {oracledb.__version__} detected, must be 1.x for CentOS 7 compatibility'"
