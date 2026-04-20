@@ -7,6 +7,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [1.3.2] - 2026-04-20
+
+### Fixed
+
+- Fixed startup warning message in compiled binary.
+
+### Improved
+
+- Enhanced non-interactive mode exit behavior for CI/CD pipelines.
+- Updated and consolidated documentation.
+- Added CI/CD quick start guide and example scripts.
+
+---
+
 ## [1.3.1] - 2026-04-19
 
 ### Added

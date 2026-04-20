@@ -1,11 +1,15 @@
 # -*- mode: python ; coding: utf-8 -*-
 
+from PyInstaller.utils.hooks import collect_all
+
+# Collect all charset_normalizer files (data, binaries, hiddenimports)
+cn_datas, cn_binaries, cn_hiddenimports = collect_all('charset_normalizer')
 
 a = Analysis(
     ['run_dlpxdbprofiler.py'],
     pathex=[],
-    binaries=[],
-    datas=[],
+    binaries=cn_binaries,
+    datas=cn_datas,
     hiddenimports=[
         'dlpxdbprofiler',
         'dlpxdbprofiler.ce_client',
@@ -20,7 +24,15 @@ a = Analysis(
         'cryptography.hazmat.backends.openssl',
         'cryptography.hazmat.primitives.ciphers.aead',
         '_cffi_backend',
-    ],
+        # charset_normalizer - comprehensive imports
+        'charset_normalizer',
+        'charset_normalizer.md',
+        'charset_normalizer.constant',
+        'charset_normalizer.utils',
+        'charset_normalizer.models',
+        'charset_normalizer.cd',
+        'charset_normalizer.api',
+    ] + cn_hiddenimports,  # Add collected hiddenimports
     hookspath=['hooks'],
     hooksconfig={},
     runtime_hooks=[],

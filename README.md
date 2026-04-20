@@ -58,141 +58,88 @@ chmod +x dlpxdbprofiler
 
 # ⚙️ Environment Variables
 
-dlpxdbprofiler allows running **non‑interactively** if environment variables are set.
+dlpxdbprofiler supports **non-interactive operation** using environment variables.
 
-## Compliance Engine
-```
-export DBP_CE_BASE_URL="http://your-mask-engine"
+**📖 Complete Reference:** See [ENVIRONMENT_VARIABLES.md](ENVIRONMENT_VARIABLES.md) for all variables and detailed examples.
+
+## Quick Reference
+
+### Compliance Engine (Required)
+```bash
+export DBP_CE_BASE_URL="http://masking-engine.company.com"
 export DBP_CE_USERNAME="admin"
 export DBP_CE_PASSWORD="xxxxxx"
-export DBP_CE_API_VERSION=v5.1.45
+export DBP_CE_API_VERSION="v5.1.46"
 ```
 
-## Application and Environment (Optional)
+### Application & Environment (Optional)
+```bash
+export DBP_APPLICATION_NAME="ProductionCRM"
+export DBP_ENVIRONMENT_NAME="ProdCRM-Masking"
 ```
-export DBP_APPLICATION_NAME="Digital Bank CRM"
-export DBP_ENVIRONMENT_NAME="Digital Bank CRM MASK"
-```
-⚠️ Note: If not set, you will be prompted to enter these values interactively.
 
-## Oracle DB parameters
-dlpxdbprofiler supports both SID and SERVICE_NAME, and they are mutually exclusive:  
-✔ If SID is used → Native SID mode  
-✔ If SERVICE_NAME is used → SERVICE mode  
-✔ Internally constructs correct JDBC URL  
-
-### Oracle (SID)
+### Database Selection (Optional - for non-interactive mode)
+```bash
+export DBP_DB_ENGINE="ORACLE"        # or MSSQL, POSTGRES, MYSQL
+export DBP_CONNECTOR_SCOPE="ALL"     # or SCHEMA
 ```
-export DBP_ORACLE_HOST="10.10.10.10"
+
+### Operation Selection (Optional - for 100% non-interactive mode)
+```bash
+export DBP_OPERATION="ALL"           # Run operation and exit (no menu)
+```
+
+**Values:** `1-11` (numeric) or `APP`, `ENV`, `CONNECTORS`, `ALL`, `DELETE_ENV`, `DELETE_APP`, `LIST_APPS`, `LIST_ENVS`, `LIST_PROFILE_SETS`, `LIST_SCHEMAS`, `RUN_PROFILE_JOBS` (descriptive)
+
+⚠️ **Critical for CI/CD:** Without `DBP_OPERATION`, the tool shows an interactive menu and waits for input.
+
+### Database Connections
+
+Choose the database you're connecting to:
+
+#### Oracle
+```bash
+export DBP_ORACLE_HOST="oracle.company.com"
 export DBP_ORACLE_PORT="1521"
-export DBP_ORACLE_SID="ORCL"
-export DBP_ORACLE_USER="hr"
+export DBP_ORACLE_SERVICE_NAME="PRODCRM"     # or use DBP_ORACLE_SID="ORCL"
+export DBP_ORACLE_USER="profiler_user"
 export DBP_ORACLE_PASSWORD="xxxxxx"
+export DBP_ORACLE_CONNECTOR_TYPE="NATIVE"    # or JDBC
 ```
 
-This constructs:
-``` 
-jdbc:oracle:thin:@host:port/SID
-```
-
-### Oracle (SERVICE_NAME)
-```
-export DBP_ORACLE_HOST="10.10.10.10"
-export DBP_ORACLE_PORT="1521"
-export DBP_ORACLE_SERVICE_NAME="appservice"
-export DBP_ORACLE_USER="hr"
-export DBP_ORACLE_PASSWORD="xxxxxx"
-```
-This constructs:
-``` 
-jdbc:oracle:thin:@//host:port/service_name
-```
-⚠️ Note: SID and SERVICE_NAME cannot be set together.
-
-
-## Oracle Thick Client ( If thick client is required. )
-```
-export DBP_ORACLE_DRIVER_MODE=thick
-export DBP_ORACLE_CLIENT_LIB_DIR="/opt/homebrew/opt/instantclient-basic/lib"
-```
-In linux environment you may have to set `LD_LIBRARY_PATH` to point to the Oracle Instant Client lib directory.
-```
-export DBP_ORACLE_CLIENT_LIB_DIR="/path/to/instantclient"
-export LD_LIBRARY_PATH="/path/to/instantclient:$LD_LIBRARY_PATH"
-```
-
-## MSSQL DB parameters
-```
-export DBP_MSSQL_HOST="10.10.10.10"
+#### MSSQL
+```bash
+export DBP_MSSQL_HOST="mssql.company.com"
 export DBP_MSSQL_PORT="1433"
-export DBP_MSSQL_DATABASE="suitecrm-dev"
-export DBP_MSSQL_USER="delphixdb"
+export DBP_MSSQL_DATABASE="crm_production"
+export DBP_MSSQL_USER="profiler_user"
 export DBP_MSSQL_PASSWORD="xxxxxx"
 ```
 
-## PostgreSQL DB parameters
-```
-export DBP_POSTGRES_HOST="10.10.10.10"
+#### PostgreSQL
+```bash
+export DBP_POSTGRES_HOST="postgres.company.com"
 export DBP_POSTGRES_PORT="5432"
-export DBP_POSTGRES_DATABASE="digitalbank"
+export DBP_POSTGRES_DATABASE="crm_production"
 export DBP_POSTGRES_SCHEMA="public"
-export DBP_POSTGRES_USER="postgres"
+export DBP_POSTGRES_USER="profiler_user"
 export DBP_POSTGRES_PASSWORD="xxxxxx"
 ```
 
-### PostgreSQL Connection Timeout (Optional)
-```
-export DBP_POSTGRES_CONNECT_TIMEOUT=60    # Connection timeout in seconds (default: 30)
-```
-⚠️ Note: If you experience connection timeouts due to network latency or firewall issues, increase this value.
-
-## MySQL DB parameters
-```
-export DBP_MYSQL_HOST="10.10.10.10"
+#### MySQL
+```bash
+export DBP_MYSQL_HOST="mysql.company.com"
 export DBP_MYSQL_PORT="3306"
-export DBP_MYSQL_DATABASE="delphixdb"
-export DBP_MYSQL_USER="root"
+export DBP_MYSQL_DATABASE="crm_production"
+export DBP_MYSQL_USER="profiler_user"
 export DBP_MYSQL_PASSWORD="xxxxxx"
 ```
 
-### MySQL Connection Timeout (Optional)
+### Profile Settings (Optional)
+```bash
+export DBP_PROFILE_SET_ID=20
+export DBP_PROFILE_MAX_PARALLEL=3    # Default: 1 (serial)
 ```
-export DBP_MYSQL_CONNECT_TIMEOUT=60    # Connection timeout in seconds (default: 30)
-```
-
-## Profile Set
-```
-export DBP_PROFILE_SET_ID=4
-```
-
-## Degree of parallelism for profile jobs
-```
-export DBP_PROFILE_MAX_PARALLEL=3
-```
-
-## Operation Selection (Optional - for 100% Non-Interactive Mode)
-```
-export DBP_OPERATION=4    # or use descriptive names like "ALL"
-```
-
-Valid values:
-- **Numeric**: `1`, `2`, `3`, `4`, `5`, `6`, `7`, `8`, `9`, `10`, `11`
-- **Descriptive**: `APP`, `ENV`, `CONNECTORS`, `ALL`, `DELETE_ENV`, `DELETE_APP`, `LIST_APPS`, `LIST_ENVS`, `LIST_PROFILE_SETS`, `LIST_SCHEMAS`, `RUN_PROFILE_JOBS`
-
-Operation mapping:
-- `1` or `APP` or `APPLICATION` = Create/Ensure Application
-- `2` or `ENV` or `ENVIRONMENT` = Create/Ensure Environment
-- `3` or `CONNECTORS` = Create Connectors (+ Rulesets + Profile Jobs)
-- `4` or `ALL` = Create ALL (App + Env + Connectors + Rulesets + Profile Jobs)
-- `5` or `DELETE_ENV` = DELETE Environment
-- `6` or `DELETE_APP` = DELETE Application
-- `7` or `LIST_APPS` = LIST Applications
-- `8` or `LIST_ENVS` = LIST Environments
-- `9` or `LIST_PROFILE_SETS` = LIST Profile Sets
-- `10` or `LIST_SCHEMAS` = LIST all Schemas in database
-- `11` or `RUN_PROFILE_JOBS` = Run Profile jobs (single or all) for environment
-
-⚠️ **Note**: When `DBP_OPERATION` is set, the tool runs in **non-interactive mode**, executes the specified operation, and exits immediately. If not set, the interactive menu is displayed.
 
 ---
 
@@ -228,47 +175,54 @@ You can enter options and follow prompts.
 
 ## **100% Non-Interactive Mode**
 
-Set the `DBP_OPERATION` environment variable to run a specific operation without any prompts:
+Set `DBP_OPERATION` to run a specific operation without any prompts:
 
 ```bash
-# Set all required environment variables
-export DBP_CE_BASE_URL="http://your-mask-engine"
-export DBP_CE_USERNAME="admin"
-export DBP_CE_PASSWORD="xxxxxx"
+#!/bin/bash
+set -euo pipefail  # Exit on error
+
+# Compliance Engine
+export DBP_CE_BASE_URL="http://masking-engine.company.com"
+export DBP_CE_USERNAME="automation"
+export DBP_CE_PASSWORD="${MASKING_PASSWORD}"  # From secrets
 export DBP_CE_API_VERSION="v5.1.46"
 
-export DBP_APPLICATION_NAME="My App"
-export DBP_ENVIRONMENT_NAME="My Env"
-export DBP_PROFILE_SET_ID=20
+# Application & Environment
+export DBP_APPLICATION_NAME="ProductionCRM"
+export DBP_ENVIRONMENT_NAME="ProdCRM-Masking"
 
-# Oracle configuration
-export DBP_ORACLE_HOST="10.160.1.61"
-export DBP_ORACLE_PORT="1521"
-export DBP_ORACLE_SID="ORCL"
-export DBP_ORACLE_USER="delphixdb"
-export DBP_ORACLE_PASSWORD="xxxxxx"
-
-# Database engine and connector scope
+# Database Selection & Scope
 export DBP_DB_ENGINE="ORACLE"
 export DBP_CONNECTOR_SCOPE="ALL"
+
+# Database Connection
+export DBP_ORACLE_HOST="oracle.company.com"
+export DBP_ORACLE_PORT="1521"
+export DBP_ORACLE_SERVICE_NAME="PRODCRM"
+export DBP_ORACLE_USER="profiler_user"
+export DBP_ORACLE_PASSWORD="${DB_PASSWORD}"  # From secrets
 export DBP_ORACLE_CONNECTOR_TYPE="NATIVE"
 
-# Operation to run (no menu will be displayed)
-export DBP_OPERATION="ALL"  # or use numeric: export DBP_OPERATION=4
+# Profile Settings
+export DBP_PROFILE_SET_ID=20
+export DBP_PROFILE_MAX_PARALLEL=3
 
-# Run the tool - it will execute operation 4 and exit
+# Operation to run (no menu will be displayed)
+export DBP_OPERATION="ALL"
+
+# Run the tool - it will execute and exit
 ./dlpxdbprofiler
 ```
 
 The tool will:
 1. Skip the interactive menu
-2. Execute the specified operation
-3. Exit immediately when complete
+2. Execute the specified operation  
+3. Exit with code 0 (success) or 1 (failure)
 
-This is ideal for:
-- CI/CD pipelines
+**Ideal for:**
+- CI/CD pipelines (GitHub Actions, GitLab CI, Jenkins)
 - Automated scripts
-- Scheduled jobs
+- Scheduled cron jobs
 - Docker containers
 
 ---
@@ -313,38 +267,46 @@ The engine then schedules N jobs concurrently using a thread pool.
 
 # 📘 Examples
 
-## Example: Run all operations with env variables set
+## Quick Interactive Example
 
-```
-export DBP_CE_BASE_URL="http://your-mask-engine"
+```bash
+# Set Compliance Engine credentials
+export DBP_CE_BASE_URL="http://masking-engine.company.com"
 export DBP_CE_USERNAME="admin"
 export DBP_CE_PASSWORD="xxxxxx"
-export DBP_CE_API_VERSION=v5.1.45
+export DBP_CE_API_VERSION="v5.1.46"
 
-# Oracle DB parameters
-export DBP_ORACLE_HOST="10.10.10.10"
+# Set database credentials (Oracle example)
+export DBP_ORACLE_HOST="oracle.company.com"
 export DBP_ORACLE_PORT="1521"
-export DBP_ORACLE_SID="ORCL"
-export DBP_ORACLE_USER="hr"
+export DBP_ORACLE_SERVICE_NAME="PRODCRM"
+export DBP_ORACLE_USER="profiler_user"
 export DBP_ORACLE_PASSWORD="xxxxxx"
 
-# Profile Set
-export DBP_PROFILE_SET_ID=4
-
-# Degree of parallelism for profile jobs
+# Set profile settings
+export DBP_PROFILE_SET_ID=20
 export DBP_PROFILE_MAX_PARALLEL=3
 
+# Run in interactive mode (shows menu)
 ./dlpxdbprofiler
 ```
 
-Then select:
-
+Then select from the menu:
 ```
 4) Create ALL
-11) RUN profile jobs
+11) Run Profile jobs
 ```
 
-Jobs will run with *3 parallel workers*.
+Jobs will run with 3 parallel workers.
+
+## Complete Non-Interactive Examples
+
+For complete, production-ready examples for all 4 database types:
+- **Oracle** - See [ENVIRONMENT_VARIABLES.md](ENVIRONMENT_VARIABLES.md#complete-example-fully-non-interactive-oracle-setup)
+- **MSSQL** - See [ENVIRONMENT_VARIABLES.md](ENVIRONMENT_VARIABLES.md#complete-example-fully-non-interactive-mssql-setup)
+- **PostgreSQL** - See [ENVIRONMENT_VARIABLES.md](ENVIRONMENT_VARIABLES.md#complete-example-fully-non-interactive-postgresql-setup)
+- **MySQL** - See [ENVIRONMENT_VARIABLES.md](ENVIRONMENT_VARIABLES.md#complete-example-ci-cd-pipeline-fully-automated)
+
 
 ---
 
@@ -565,6 +527,10 @@ The application now provides helpful error messages when connection fails:
 - Lists common troubleshooting steps
 - Returns gracefully without crashing
 - Allows you to re-run with corrected settings
+
+---
+
+For complete environment variable documentation, see [ENVIRONMENT_VARIABLES.md](ENVIRONMENT_VARIABLES.md).
 
 ---
 

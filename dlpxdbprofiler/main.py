@@ -7,6 +7,9 @@ import warnings
 from dataclasses import dataclass
 from typing import Optional
 
+# Suppress charset_normalizer warning from requests in PyInstaller builds
+warnings.filterwarnings("ignore", message=".*Unable to find acceptable character detection dependency.*")
+
 import requests
 from requests.packages.urllib3.exceptions import InsecureRequestWarning
 
@@ -1801,9 +1804,14 @@ def main():
                 sys.exit(1)
         except (CEError, OracleDBError, MSSQLDBError, PostgresDBError, MySQLDBError, ValueError) as e:
             logger.error(f"Operation failed: {e}")
+            sys.stdout.flush()
+            sys.stderr.flush()
             sys.exit(1)
 
         # Exit after running the operation in non-interactive mode
+        logger.info("Operation completed successfully. Exiting non-interactive mode.")
+        sys.stdout.flush()
+        sys.stderr.flush()
         sys.exit(0)
 
     # Interactive menu mode

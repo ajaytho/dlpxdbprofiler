@@ -145,6 +145,9 @@ jobs:
           # Verify oracledb can detect cryptography (required for thin mode)
           ./bin/micromamba run -p /opt/mambaenv python -c "import oracledb; print('Testing oracledb thin mode cryptography support...'); import cryptography; print('✅ cryptography is available for oracledb')"
 
+          # Verify charset-normalizer is installed (required by requests)
+          ./bin/micromamba run -p /opt/mambaenv python -c "import charset_normalizer; print(f'charset-normalizer version: {charset_normalizer.__version__}'); print('✅ charset-normalizer is available')"
+
           # Patch PyInstaller conda hook to tolerate missing "depends" key
           ./bin/micromamba run -p /opt/mambaenv python - <<'PY'
           import pathlib, re, sys
@@ -201,12 +204,33 @@ jobs:
 
           ./bin/micromamba run -p /opt/mambaenv python -m PyInstaller --clean --noconfirm dlpxdbprofiler.spec
 
+          # Debug: Check what charset_normalizer files are in the build
+          echo "Checking for charset_normalizer in build..."
+          if [ -d "/src/build/dlpxdbprofiler" ]; then
+            find /src/build/dlpxdbprofiler -name "*charset*" -o -name "*chardet*" || echo "No charset files found in build"
+          fi
+
           # Test the binary before packaging
           echo "Testing portable Linux binary..."
           chmod +x /src/dist/dlpxdbprofiler
+          
+          echo "Test 1: Version check"
           /src/dist/dlpxdbprofiler --version
+          
+          echo "Test 2: Help check"
           /src/dist/dlpxdbprofiler --help
-          echo "✅ Binary test passed!"
+          
+          echo "Test 3: Verify no charset_normalizer warning"
+          if /src/dist/dlpxdbprofiler --version 2>&1 | grep -q "RequestsDependencyWarning"; then
+            echo "❌ ERROR: charset_normalizer warning detected!"
+            echo "The binary is missing charset_normalizer dependency."
+            /src/dist/dlpxdbprofiler --version 2>&1
+            exit 1
+          else
+            echo "✅ No charset_normalizer warning - test passed!"
+          fi
+          
+          echo "✅ All binary tests passed!"
 
           mkdir -p /src/artifacts
           mv /src/dist/dlpxdbprofiler /src/artifacts/dlpxdbprofiler-linux

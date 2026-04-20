@@ -228,6 +228,79 @@ export DBP_PROFILE_MAX_PARALLEL=3  # Default: 1 (serial execution)
 
 ---
 
+## Complete Example: CI/CD Pipeline (Fully Automated)
+
+This example shows how to run dlpxdbprofiler in a **fully automated, non-interactive** CI/CD pipeline:
+
+```bash
+#!/bin/bash
+# ci_deploy.sh - Complete automation script for CI/CD
+
+set -euo pipefail  # Exit on error
+
+# =====================================
+# STEP 1: Compliance Engine Configuration
+# =====================================
+export DBP_CE_BASE_URL="http://masking-engine.company.com"
+export DBP_CE_USERNAME="automation_user"
+export DBP_CE_PASSWORD="${MASKING_PASSWORD}"  # From CI/CD secrets
+export DBP_CE_API_VERSION="v5.1.46"
+
+# =====================================
+# STEP 2: Application & Environment
+# =====================================
+export DBP_APPLICATION_NAME="ProductionCRM"
+export DBP_ENVIRONMENT_NAME="ProdCRM-Masking"
+
+# =====================================
+# STEP 3: Database Selection & Scope
+# =====================================
+export DBP_DB_ENGINE="MYSQL"
+export DBP_CONNECTOR_SCOPE="ALL"
+
+# =====================================
+# STEP 4: Database Connection Details
+# =====================================
+export DBP_MYSQL_HOST="prod-mysql.company.com"
+export DBP_MYSQL_PORT="3306"
+export DBP_MYSQL_DATABASE="crm_production"
+export DBP_MYSQL_USER="profiler_user"
+export DBP_MYSQL_PASSWORD="${DB_PASSWORD}"  # From CI/CD secrets
+export DBP_MYSQL_CONNECT_TIMEOUT=60
+
+# =====================================
+# STEP 5: Profile Settings
+# =====================================
+export DBP_PROFILE_SET_ID=20
+export DBP_PROFILE_MAX_PARALLEL=3
+
+# =====================================
+# STEP 6: 🔥 CRITICAL - Non-Interactive Mode
+# =====================================
+# This tells the tool to execute operation and EXIT
+# Without this, the tool will hang waiting for menu input!
+export DBP_OPERATION="ALL"
+
+# =====================================
+# STEP 7: Run the Tool
+# =====================================
+echo "Starting dlpxdbprofiler in non-interactive mode..."
+./dlpxdbprofiler
+
+# Capture exit code
+EXIT_CODE=$?
+
+if [ $EXIT_CODE -eq 0 ]; then
+    echo "✅ dlpxdbprofiler completed successfully!"
+    exit 0
+else
+    echo "❌ dlpxdbprofiler failed with exit code $EXIT_CODE"
+    exit 1
+fi
+```
+
+---
+
 ## Complete Example: Fully Non-Interactive PostgreSQL Setup
 
 ```bash
@@ -384,7 +457,10 @@ export DBP_MYSQL_CONNECT_TIMEOUT=60
 # Optional: Enable parallel profile job execution
 export DBP_PROFILE_MAX_PARALLEL=2
 
-# Run the profiler
+# REQUIRED for non-interactive mode (CI/CD)
+export DBP_OPERATION="ALL"
+
+# Run the profiler - will execute and exit
 ./dlpxdbprofiler
 ```
 
@@ -457,74 +533,9 @@ When you set environment variables:
 
 ---
 
-## Table Exclusion Configuration
+## Table Exclusion
 
-dlpxdbprofiler supports excluding specific tables from being added to rulesets via a file-based configuration (not an environment variable).
-
-### Exclude List File
-
-**File:** `exclude_inventorylist.txt`  
-**Location:** Same directory where you run dlpxdbprofiler  
-**Format:** Plain text file with one pattern per line
-
-### File Format
-
-```
-# Comments start with #
-# Empty lines are ignored
-
-# For Oracle, MSSQL, Postgres: SCHEMA.TABLE
-DELPHIXDB.EMPLOYEES
-HR.SALARY_INFO
-
-# Exclude all tables in a schema
-TEMP.*
-STAGING.*
-
-# Exclude specific table across all schemas
-*.TEMP_TABLE
-*.AUDIT_LOG
-
-# MySQL: DATABASE.TABLE or just TABLE
-mydb.users
-audit_log
-
-# Wildcards: * matches any characters
-DELPHIXDB.TMP_*      # Tables starting with TMP_
-*.*_BAK              # Tables ending with _BAK
-*.*TEMP*             # Tables containing TEMP
-```
-
-### Pattern Syntax
-
-- **SCHEMA.TABLE** - Exact match for schema and table
-- **SCHEMA.*** - All tables in a specific schema
-- **\*.TABLE** - Specific table across all schemas
-- **SCHEMA.PREFIX\*** - Tables starting with PREFIX
-- **SCHEMA.\*SUFFIX** - Tables ending with SUFFIX
-- **SCHEMA.\*PATTERN\*** - Tables containing PATTERN
-- **TABLE** (MySQL only) - Treated as \*.TABLE
-
-### How It Works
-
-1. Place `exclude_inventorylist.txt` in the working directory
-2. Run dlpxdbprofiler normally
-3. Tables matching patterns will be excluded from rulesets
-4. Logs will show how many tables were excluded per schema
-
-### Example Output
-
-```
-[INFO] Loading exclude list from /path/to/exclude_inventorylist.txt
-[INFO]   Exclude pattern: TEMP.*
-[INFO]   Exclude pattern: *.TMP_*
-[INFO] Loaded 2 exclude pattern(s) from exclude_inventorylist.txt
-[INFO] Excluded 5 table(s) from schema 'DELPHIXDB' based on exclude list. Remaining: 45
-```
-
-### Sample File
-
-A sample configuration file `exclude_inventorylist.txt.sample` is provided with comprehensive examples.
+For information on excluding tables from profiling using `exclude_inventorylist.txt`, see [README.md](README.md#-exclude-list-feature).
 
 ---
 
