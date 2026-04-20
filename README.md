@@ -398,7 +398,7 @@ A sample configuration file `exclude_inventorylist.txt.sample` is provided with 
 # Comments start with #
 # Empty lines are ignored
 
-# For Oracle, MSSQL, Postgres: SCHEMA.TABLE
+# EXCLUDE MODE (default) - Tables matching these patterns will be excluded
 DELPHIXDB.EMPLOYEES
 HR.SALARY_INFO
 
@@ -409,6 +409,11 @@ STAGING.*
 # Exclude specific table across all schemas
 *.TEMP_TABLE
 *.AUDIT_LOG
+
+# INCLUDE-ONLY MODE (NEW!) - Prefix with ! to specify tables to INCLUDE
+# Only tables matching these patterns will be included (all others excluded)
+!*.DEMOCRM*           # Only include tables starting with DEMOCRM
+!PRODUCTION.APP_*     # Only include APP_* tables in PRODUCTION schema
 
 # MySQL: DATABASE.TABLE or just TABLE
 mydb.users
@@ -456,7 +461,34 @@ MDSYS.*
 *.*_ARCHIVE
 ```
 
-## How It Works
+### Include-Only: Profile Only DemoCRM Tables (NEW!)
+```
+# Only include tables starting with DEMOCRM (all others excluded)
+!*.DEMOCRM*
+```
+
+**Result:** Only `DEMOCRM_USERS`, `DEMOCRM_ORDERS`, etc. are profiled. All other tables are skipped.
+
+### Include-Only: Profile Only Application Tables
+```
+# Only include application-specific tables
+!*.MYAPP_*
+!*.SHARED_*
+```
+
+### Include-Only with Additional Exclusions
+```
+# Include only DEMOCRM tables
+!*.DEMOCRM*
+
+# But exclude backup tables even if they match
+*.*_BAK
+*.*_BACKUP
+```
+
+**Result:** Profiles DEMOCRM tables except `DEMOCRM_DATA_BAK` (excluded by backup pattern).
+
+## Pattern Rules
 
 1. When dlpxdbprofiler starts connector creation, it looks for `exclude_inventorylist.txt` in the current directory
 2. If found, it loads all patterns and logs them

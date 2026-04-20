@@ -121,6 +121,12 @@ def load_exclude_list(logger: logging.Logger) -> dict:
     # For MySQL: DATABASE.TABLE or just TABLE
     # Wildcards supported: * matches any characters
 
+    EXCLUDE MODE (default):
+    Tables matching these patterns will be excluded
+
+    INCLUDE-ONLY MODE (prefix with !):
+    Only tables matching these patterns will be included (all others excluded)
+
     Example:
         # Exclude specific tables
         DELPHIXDB.EMPLOYEES
@@ -132,25 +138,36 @@ def load_exclude_list(logger: logging.Logger) -> dict:
         # Exclude specific table across all schemas
         *.TEMP_TABLE
 
+        # INCLUDE-ONLY: Only include tables starting with democrm (exclude all others)
+        !*.DEMOCRM*
+
+        # INCLUDE-ONLY: Only include democrm tables in specific schema
+        !DELPHIXDB.DEMOCRM*
+
         # MySQL examples
         mydb.users
         audit_log
+        !*.democrm*    # Only include democrm tables
 
     Returns:
-        Dictionary with database engines as keys, each containing a list of patterns:
+        Dictionary with exclude and include patterns:
         {
-            'entries': [('SCHEMA', 'TABLE'), ('SCHEMA2', '*'), ...]
+            'exclude': [('SCHEMA', 'TABLE'), ...],
+            'include_only': [('SCHEMA', 'TABLE'), ...]
         }
     """
     exclude_file_path = os.path.join(os.getcwd(), EXCLUDE_LIST_FILE)
 
     if not os.path.exists(exclude_file_path):
         logger.info(f"No exclude list file found at {exclude_file_path}. All tables will be included.")
-        return {'entries': []}
+        return {'entries': [], 'exclude': [], 'include_only': []}
 
     logger.info(f"Loading exclude list from {exclude_file_path}")
 
-    entries = []
+    entries = []  # Legacy support
+    exclude_patterns = []
+    include_only_patterns = []
+
     try:
         with open(exclude_file_path, 'r', encoding='utf-8') as f:
             line_num = 0
@@ -163,30 +180,63 @@ def load_exclude_list(logger: logging.Logger) -> dict:
                 if not line or line.startswith('#'):
                     continue
 
+                # Check if this is an include-only pattern (starts with !)
+                is_include_only = line.startswith('!')
+                if is_include_only:
+                    line = line[1:].strip()  # Remove the ! prefix
+
                 # Parse the pattern
                 if '.' in line:
                     parts = line.split('.', 1)
                     schema_pattern = parts[0].strip()
                     table_pattern = parts[1].strip()
-                    entries.append((schema_pattern, table_pattern))
-                    logger.info(f"  Exclude pattern: {schema_pattern}.{table_pattern}")
+                    pattern_tuple = (schema_pattern, table_pattern)
+
+                    if is_include_only:
+                        include_only_patterns.append(pattern_tuple)
+                        logger.info(f"  Include-only pattern: {schema_pattern}.{table_pattern}")
+                    else:
+                        exclude_patterns.append(pattern_tuple)
+                        entries.append(pattern_tuple)  # Legacy
+                        logger.info(f"  Exclude pattern: {schema_pattern}.{table_pattern}")
                 else:
                     # No schema specified - treat as table name only (for MySQL or wildcard)
-                    entries.append(('*', line.strip()))
-                    logger.info(f"  Exclude pattern: *.{line.strip()}")
+                    pattern_tuple = ('*', line.strip())
 
-        logger.info(f"Loaded {len(entries)} exclude pattern(s) from {EXCLUDE_LIST_FILE}")
+                    if is_include_only:
+                        include_only_patterns.append(pattern_tuple)
+                        logger.info(f"  Include-only pattern: *.{line.strip()}")
+                    else:
+                        exclude_patterns.append(pattern_tuple)
+                        entries.append(pattern_tuple)  # Legacy
+                        logger.info(f"  Exclude pattern: *.{line.strip()}")
+
+        total_patterns = len(exclude_patterns) + len(include_only_patterns)
+        logger.info(f"Loaded {total_patterns} pattern(s) from {EXCLUDE_LIST_FILE}")
+        if include_only_patterns:
+            logger.info(f"  - {len(include_only_patterns)} include-only pattern(s) (only matching tables will be included)")
+        if exclude_patterns:
+            logger.info(f"  - {len(exclude_patterns)} exclude pattern(s)")
 
     except Exception as e:
         logger.error(f"Failed to read exclude list file: {e}")
-        return {'entries': []}
+        return {'entries': [], 'exclude': [], 'include_only': []}
 
-    return {'entries': entries}
+    return {
+        'entries': entries,  # Legacy support
+        'exclude': exclude_patterns,
+        'include_only': include_only_patterns
+    }
 
 
 def should_exclude_table(schema: str, table: str, exclude_list: dict) -> bool:
     """
     Check if a table should be excluded based on the exclude list patterns.
+
+    Logic:
+    1. If include-only patterns exist, table must match at least one to be included
+    2. If exclude patterns exist, table matching any exclude pattern is excluded
+    3. Include-only patterns take precedence over exclude patterns
 
     Args:
         schema: Schema/database name (can be None for MySQL single-table context)
@@ -198,30 +248,55 @@ def should_exclude_table(schema: str, table: str, exclude_list: dict) -> bool:
     """
     import fnmatch
 
-    entries = exclude_list.get('entries', [])
+    include_only_patterns = exclude_list.get('include_only', [])
+    exclude_patterns = exclude_list.get('exclude', [])
 
-    if not entries:
-        return False
+    # Legacy support
+    if not include_only_patterns and not exclude_patterns:
+        entries = exclude_list.get('entries', [])
+        if not entries:
+            return False
+        exclude_patterns = entries
 
-    for schema_pattern, table_pattern in entries:
-        # Match schema pattern
+    def pattern_matches(schema_pattern: str, table_pattern: str) -> bool:
+        """Check if schema and table match the given patterns (case-insensitive)."""
+        # Match schema pattern (case-insensitive)
+        schema_lower = (schema or '').lower()
+        schema_pattern_lower = schema_pattern.lower()
+
         schema_match = (
             schema_pattern == '*' or
-            fnmatch.fnmatch(schema or '', schema_pattern) or
-            fnmatch.fnmatch(schema or '', schema_pattern.upper()) or
-            fnmatch.fnmatch(schema or '', schema_pattern.lower())
+            fnmatch.fnmatch(schema_lower, schema_pattern_lower)
         )
 
-        # Match table pattern
+        # Match table pattern (case-insensitive)
+        table_lower = (table or '').lower()
+        table_pattern_lower = table_pattern.lower()
+
         table_match = (
             table_pattern == '*' or
-            fnmatch.fnmatch(table or '', table_pattern) or
-            fnmatch.fnmatch(table or '', table_pattern.upper()) or
-            fnmatch.fnmatch(table or '', table_pattern.lower())
+            fnmatch.fnmatch(table_lower, table_pattern_lower)
         )
 
-        if schema_match and table_match:
+        return schema_match and table_match
+
+    # If include-only patterns exist, check if table matches any of them
+    if include_only_patterns:
+        matches_include = False
+        for schema_pattern, table_pattern in include_only_patterns:
+            if pattern_matches(schema_pattern, table_pattern):
+                matches_include = True
+                break
+
+        # If table doesn't match any include-only pattern, exclude it
+        if not matches_include:
             return True
+
+    # Check exclude patterns
+    if exclude_patterns:
+        for schema_pattern, table_pattern in exclude_patterns:
+            if pattern_matches(schema_pattern, table_pattern):
+                return True
 
     return False
 
@@ -239,7 +314,14 @@ def filter_tables(schema: str, tables: list, exclude_list: dict, logger: logging
     Returns:
         Filtered list of table names
     """
-    if not exclude_list.get('entries'):
+    # Check if there are any patterns to apply
+    has_patterns = (
+        exclude_list.get('entries') or
+        exclude_list.get('exclude') or
+        exclude_list.get('include_only')
+    )
+
+    if not has_patterns:
         return tables
 
     original_count = len(tables)

@@ -11,8 +11,13 @@
 # - Lines starting with # are comments and will be ignored
 # - Empty lines are ignored
 # - Each non-comment line should contain a pattern to match tables
-# - Patterns are case-sensitive by default, but the matcher tries multiple cases
+# - Patterns are case-insensitive by default
 # - Wildcards are supported: * matches any characters (including none)
+#
+# TWO MODES:
+# ----------
+# 1. EXCLUDE MODE (default): Tables matching patterns are excluded
+# 2. INCLUDE-ONLY MODE (prefix with !): Only tables matching are included
 #
 # PATTERN SYNTAX:
 # ---------------
@@ -29,6 +34,15 @@
 #   TABLE                - Table name in any database (treated as *.TABLE)
 #   DATABASE.*           - All tables in a specific database
 #   *.TABLE              - Specific table name
+#
+# INCLUDE-ONLY MODE (NEW!):
+# -------------------------
+# Prefix pattern with ! to make it "include-only"
+# Only tables matching these patterns will be included (all others excluded)
+#
+#   !*.DEMOCRM*          - Only include tables starting with DEMOCRM
+#   !SCHEMA.APP_*        - Only include tables starting with APP_ in SCHEMA
+#   !*.PREFIX*           - Only include tables containing PREFIX
 #
 # ============================================================================
 # EXAMPLES
@@ -103,7 +117,40 @@
 
 
 # ----------------------------------------------------------------------------
-# Example 5: Complex patterns
+# Example 5: Include-only patterns - Only profile specific tables
+# ----------------------------------------------------------------------------
+# NEW! Use ! prefix to specify which tables to INCLUDE (all others excluded)
+
+# Only include tables starting with DEMOCRM (exclude all others)
+# !*.DEMOCRM*
+
+# Only include tables in PRODUCTION schema
+# !PRODUCTION.*
+
+# Only include application-specific tables
+# !*.MYAPP_*
+# !*.SHARED_*
+
+# Only include tables starting with specific prefix in specific schema
+# !DELPHIXDB.DATA_*
+# !DELPHIXDB.CONFIG_*
+
+
+# ----------------------------------------------------------------------------
+# Example 6: Mixed include-only and exclude patterns
+# ----------------------------------------------------------------------------
+# Combine include-only with additional exclusions
+
+# Include only DEMOCRM tables
+# !*.DEMOCRM*
+
+# But exclude backup tables even if they match
+# *.*_BAK
+# *.*_BACKUP
+
+
+# ----------------------------------------------------------------------------
+# Example 7: Complex patterns
 # ----------------------------------------------------------------------------
 
 # Exclude Oracle system schemas
@@ -143,5 +190,8 @@
 
 # Example: Exclude specific tables from being profiled
 # MYSCHEMA.DO_NOT_PROFILE_TABLE
+
+# Example: Only include your application tables (everything else excluded)
+# !*.MYAPP_*
 
 

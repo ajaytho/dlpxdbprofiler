@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [1.3.1] - 2026-04-19
+
+### Added
+
+- Added feature to include tables for profiling using `exclude_inventorylist.txt` file.
+
+---
+
 ## [1.3.0] - 2026-04-19
 
 ### Added
