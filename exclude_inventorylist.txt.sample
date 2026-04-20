@@ -1,0 +1,147 @@
+# ============================================================================
+# Exclude Inventory List - Sample Configuration
+# ============================================================================
+#
+# This file allows you to exclude specific tables from being added to rulesets
+# during connector creation. The file should be named "exclude_inventorylist.txt"
+# and placed in the same directory where you run dlpxdbprofiler.
+#
+# FILE FORMAT:
+# ------------
+# - Lines starting with # are comments and will be ignored
+# - Empty lines are ignored
+# - Each non-comment line should contain a pattern to match tables
+# - Patterns are case-sensitive by default, but the matcher tries multiple cases
+# - Wildcards are supported: * matches any characters (including none)
+#
+# PATTERN SYNTAX:
+# ---------------
+# For Oracle, MSSQL, Postgres:
+#   SCHEMA.TABLE         - Exact schema and table name
+#   SCHEMA.*             - All tables in a specific schema
+#   *.TABLE              - Specific table name across all schemas
+#   SCHEMA.PREFIX*       - All tables starting with PREFIX in SCHEMA
+#   SCHEMA.*SUFFIX       - All tables ending with SUFFIX in SCHEMA
+#   SCHEMA.*PATTERN*     - All tables containing PATTERN in SCHEMA
+#
+# For MySQL:
+#   DATABASE.TABLE       - Exact database and table name
+#   TABLE                - Table name in any database (treated as *.TABLE)
+#   DATABASE.*           - All tables in a specific database
+#   *.TABLE              - Specific table name
+#
+# ============================================================================
+# EXAMPLES
+# ============================================================================
+
+# ----------------------------------------------------------------------------
+# Example 1: Exclude specific tables by exact name
+# ----------------------------------------------------------------------------
+# Useful for excluding known sensitive or system tables
+
+# Oracle examples (schema and table names are typically uppercase)
+# DELPHIXDB.EMPLOYEES
+# HR.SALARY_INFO
+# FINANCE.ACCOUNTS
+
+# MSSQL examples (case-sensitive based on collation)
+# dbo.SensitiveData
+# accounting.PayrollDetails
+
+# Postgres examples (names are typically lowercase unless quoted)
+# public.user_passwords
+# finance.credit_cards
+
+# MySQL examples
+# mydb.users
+# appdb.sessions
+
+
+# ----------------------------------------------------------------------------
+# Example 2: Exclude all tables in a specific schema/database
+# ----------------------------------------------------------------------------
+# Useful for excluding entire schemas that shouldn't be profiled
+
+# Oracle/MSSQL/Postgres: exclude all tables in a schema
+# TEMP.*
+# STAGING.*
+# SYS.*
+
+# MySQL: exclude all tables in a database
+# test_database.*
+# temp_db.*
+
+
+# ----------------------------------------------------------------------------
+# Example 3: Exclude specific table across all schemas
+# ----------------------------------------------------------------------------
+# Useful for excluding common table names that appear in multiple schemas
+
+# Exclude all tables named TEMP_TABLE in any schema
+# *.TEMP_TABLE
+# *.AUDIT_LOG
+# *.CHANGELOG
+
+
+# ----------------------------------------------------------------------------
+# Example 4: Exclude tables by pattern (prefix, suffix, contains)
+# ----------------------------------------------------------------------------
+# Useful for excluding groups of tables that follow naming conventions
+
+# Exclude all tables starting with "TMP_" in DELPHIXDB schema
+# DELPHIXDB.TMP_*
+
+# Exclude all tables ending with "_BAK" in any schema
+# *.*_BAK
+# *.*_BACKUP
+
+# Exclude all tables containing "TEMP" in the name
+# *.*TEMP*
+
+# Exclude all tables starting with "SYS" in any schema
+# *.SYS*
+
+
+# ----------------------------------------------------------------------------
+# Example 5: Complex patterns
+# ----------------------------------------------------------------------------
+
+# Exclude Oracle system schemas
+# SYS.*
+# SYSTEM.*
+# DBSNMP.*
+# OUTLN.*
+# MDSYS.*
+# ORDSYS.*
+# CTXSYS.*
+# XDB.*
+# WMSYS.*
+
+# Exclude MSSQL system schemas
+# sys.*
+# INFORMATION_SCHEMA.*
+
+# Exclude PostgreSQL system schemas
+# pg_catalog.*
+# information_schema.*
+# pg_toast.*
+
+# Exclude temporary tables (common pattern)
+# *.TMP_*
+# *.TEMP_*
+# *._TEMP
+
+# Exclude backup tables
+# *.*_OLD
+# *.*_ARCHIVE
+
+
+# ============================================================================
+# YOUR CUSTOM EXCLUSIONS
+# ============================================================================
+# Add your custom exclusion patterns below:
+
+# Example: Exclude specific tables from being profiled
+# MYSCHEMA.DO_NOT_PROFILE_TABLE
+
+

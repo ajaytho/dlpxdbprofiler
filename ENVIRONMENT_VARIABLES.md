@@ -49,6 +49,65 @@ export DBP_CONNECTOR_SCOPE="ALL"
 
 ---
 
+## Operation Selection (100% Non-Interactive Mode)
+
+**NEW!** Optional - Set this to run a specific operation without displaying the menu:
+
+```bash
+# Operation Selection
+# Numeric values: 1-11
+# Descriptive values: APP, ENV, CONNECTORS, ALL, DELETE_ENV, DELETE_APP, 
+#                     LIST_APPS, LIST_ENVS, LIST_PROFILE_SETS, LIST_SCHEMAS, RUN_PROFILE_JOBS
+export DBP_OPERATION="ALL"
+```
+
+**Operation Mapping:**
+
+| Numeric | Descriptive Values | Description |
+|---------|-------------------|-------------|
+| `1` | `APP`, `APPLICATION` | Create/Ensure Application |
+| `2` | `ENV`, `ENVIRONMENT` | Create/Ensure Environment |
+| `3` | `CONNECTORS` | Create Connectors (+ Rulesets + Profile Jobs) |
+| `4` | `ALL` | Create ALL (App + Env + Connectors + Rulesets + Profile Jobs) |
+| `5` | `DELETE_ENV` | DELETE Environment |
+| `6` | `DELETE_APP` | DELETE Application |
+| `7` | `LIST_APPS` | LIST Applications |
+| `8` | `LIST_ENVS` | LIST Environments |
+| `9` | `LIST_PROFILE_SETS` | LIST Profile Sets |
+| `10` | `LIST_SCHEMAS` | LIST all Schemas in database |
+| `11` | `RUN_PROFILE_JOBS` | Run Profile jobs (single or all) for environment |
+
+**Examples:**
+
+```bash
+# Using numeric value
+export DBP_OPERATION=4
+
+# Using descriptive value
+export DBP_OPERATION="ALL"
+
+# List all applications
+export DBP_OPERATION="LIST_APPS"
+
+# Run profile jobs
+export DBP_OPERATION=11
+```
+
+⚠️ **Important Behavior:**
+- When `DBP_OPERATION` is set, the tool runs in **non-interactive mode**
+- The specified operation is executed immediately
+- The tool exits after the operation completes (no menu is displayed)
+- If not set, the interactive menu is displayed (default behavior)
+
+**Use Cases:**
+- CI/CD pipelines
+- Automated scripts
+- Scheduled cron jobs
+- Docker containers
+- Kubernetes jobs
+
+---
+
 ## Profile Set Configuration
 
 Optional - Defaults to 4 if not set:
@@ -363,6 +422,7 @@ When you set environment variables:
 | `DBP_ENVIRONMENT_NAME` | No | (prompt) | Environment name |
 | `DBP_DB_ENGINE` | No | (prompt) | Database engine (ORACLE, MSSQL, POSTGRES, MYSQL or 1-4) |
 | `DBP_CONNECTOR_SCOPE` | No | (prompt) | Connector scope (SCHEMA/SINGLE/1 or DB/ALL/2) |
+| `DBP_OPERATION` | No | (menu) | Operation to run (1-11 or descriptive name) - skips menu |
 | `DBP_PROFILE_SET_ID` | No | 20 | Profile set ID |
 | `DBP_ORACLE_HOST` | Conditional | - | Oracle host |
 | `DBP_ORACLE_PORT` | Conditional | - | Oracle port |
@@ -394,6 +454,77 @@ When you set environment variables:
 | `DBP_PROFILE_MAX_PARALLEL` | No | 1 | Parallel profile job execution (1=serial) |
 
 **Conditional:** Required when selecting that specific database engine.
+
+---
+
+## Table Exclusion Configuration
+
+dlpxdbprofiler supports excluding specific tables from being added to rulesets via a file-based configuration (not an environment variable).
+
+### Exclude List File
+
+**File:** `exclude_inventorylist.txt`  
+**Location:** Same directory where you run dlpxdbprofiler  
+**Format:** Plain text file with one pattern per line
+
+### File Format
+
+```
+# Comments start with #
+# Empty lines are ignored
+
+# For Oracle, MSSQL, Postgres: SCHEMA.TABLE
+DELPHIXDB.EMPLOYEES
+HR.SALARY_INFO
+
+# Exclude all tables in a schema
+TEMP.*
+STAGING.*
+
+# Exclude specific table across all schemas
+*.TEMP_TABLE
+*.AUDIT_LOG
+
+# MySQL: DATABASE.TABLE or just TABLE
+mydb.users
+audit_log
+
+# Wildcards: * matches any characters
+DELPHIXDB.TMP_*      # Tables starting with TMP_
+*.*_BAK              # Tables ending with _BAK
+*.*TEMP*             # Tables containing TEMP
+```
+
+### Pattern Syntax
+
+- **SCHEMA.TABLE** - Exact match for schema and table
+- **SCHEMA.*** - All tables in a specific schema
+- **\*.TABLE** - Specific table across all schemas
+- **SCHEMA.PREFIX\*** - Tables starting with PREFIX
+- **SCHEMA.\*SUFFIX** - Tables ending with SUFFIX
+- **SCHEMA.\*PATTERN\*** - Tables containing PATTERN
+- **TABLE** (MySQL only) - Treated as \*.TABLE
+
+### How It Works
+
+1. Place `exclude_inventorylist.txt` in the working directory
+2. Run dlpxdbprofiler normally
+3. Tables matching patterns will be excluded from rulesets
+4. Logs will show how many tables were excluded per schema
+
+### Example Output
+
+```
+[INFO] Loading exclude list from /path/to/exclude_inventorylist.txt
+[INFO]   Exclude pattern: TEMP.*
+[INFO]   Exclude pattern: *.TMP_*
+[INFO] Loaded 2 exclude pattern(s) from exclude_inventorylist.txt
+[INFO] Excluded 5 table(s) from schema 'DELPHIXDB' based on exclude list. Remaining: 45
+```
+
+### Sample File
+
+A sample configuration file `exclude_inventorylist.txt.sample` is provided with comprehensive examples.
 
 ---
 

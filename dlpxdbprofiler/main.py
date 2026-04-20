@@ -104,6 +104,160 @@ class MySQLConfig:
     password: str = ""
 
 
+# ---------------------------------------------------------------------------
+# Exclude list handling
+# ---------------------------------------------------------------------------
+
+EXCLUDE_LIST_FILE = "exclude_inventorylist.txt"
+
+
+def load_exclude_list(logger: logging.Logger) -> dict:
+    """
+    Load the exclude list from exclude_inventorylist.txt if it exists.
+
+    File format (case-sensitive):
+    # Comments start with #
+    # For Oracle, MSSQL, Postgres: SCHEMA.TABLE or schema.table
+    # For MySQL: DATABASE.TABLE or just TABLE
+    # Wildcards supported: * matches any characters
+
+    Example:
+        # Exclude specific tables
+        DELPHIXDB.EMPLOYEES
+        TESTSCHEMA.SENSITIVE_DATA
+
+        # Exclude all tables in a schema (Oracle/MSSQL/Postgres)
+        HR.*
+
+        # Exclude specific table across all schemas
+        *.TEMP_TABLE
+
+        # MySQL examples
+        mydb.users
+        audit_log
+
+    Returns:
+        Dictionary with database engines as keys, each containing a list of patterns:
+        {
+            'entries': [('SCHEMA', 'TABLE'), ('SCHEMA2', '*'), ...]
+        }
+    """
+    exclude_file_path = os.path.join(os.getcwd(), EXCLUDE_LIST_FILE)
+
+    if not os.path.exists(exclude_file_path):
+        logger.info(f"No exclude list file found at {exclude_file_path}. All tables will be included.")
+        return {'entries': []}
+
+    logger.info(f"Loading exclude list from {exclude_file_path}")
+
+    entries = []
+    try:
+        with open(exclude_file_path, 'r', encoding='utf-8') as f:
+            line_num = 0
+            for line in f:
+                line_num += 1
+                # Strip whitespace
+                line = line.strip()
+
+                # Skip empty lines and comments
+                if not line or line.startswith('#'):
+                    continue
+
+                # Parse the pattern
+                if '.' in line:
+                    parts = line.split('.', 1)
+                    schema_pattern = parts[0].strip()
+                    table_pattern = parts[1].strip()
+                    entries.append((schema_pattern, table_pattern))
+                    logger.info(f"  Exclude pattern: {schema_pattern}.{table_pattern}")
+                else:
+                    # No schema specified - treat as table name only (for MySQL or wildcard)
+                    entries.append(('*', line.strip()))
+                    logger.info(f"  Exclude pattern: *.{line.strip()}")
+
+        logger.info(f"Loaded {len(entries)} exclude pattern(s) from {EXCLUDE_LIST_FILE}")
+
+    except Exception as e:
+        logger.error(f"Failed to read exclude list file: {e}")
+        return {'entries': []}
+
+    return {'entries': entries}
+
+
+def should_exclude_table(schema: str, table: str, exclude_list: dict) -> bool:
+    """
+    Check if a table should be excluded based on the exclude list patterns.
+
+    Args:
+        schema: Schema/database name (can be None for MySQL single-table context)
+        table: Table name
+        exclude_list: Dictionary returned by load_exclude_list()
+
+    Returns:
+        True if the table should be excluded, False otherwise
+    """
+    import fnmatch
+
+    entries = exclude_list.get('entries', [])
+
+    if not entries:
+        return False
+
+    for schema_pattern, table_pattern in entries:
+        # Match schema pattern
+        schema_match = (
+            schema_pattern == '*' or
+            fnmatch.fnmatch(schema or '', schema_pattern) or
+            fnmatch.fnmatch(schema or '', schema_pattern.upper()) or
+            fnmatch.fnmatch(schema or '', schema_pattern.lower())
+        )
+
+        # Match table pattern
+        table_match = (
+            table_pattern == '*' or
+            fnmatch.fnmatch(table or '', table_pattern) or
+            fnmatch.fnmatch(table or '', table_pattern.upper()) or
+            fnmatch.fnmatch(table or '', table_pattern.lower())
+        )
+
+        if schema_match and table_match:
+            return True
+
+    return False
+
+
+def filter_tables(schema: str, tables: list, exclude_list: dict, logger: logging.Logger) -> list:
+    """
+    Filter out excluded tables from a list.
+
+    Args:
+        schema: Schema/database name
+        tables: List of table names
+        exclude_list: Dictionary returned by load_exclude_list()
+        logger: Logger instance
+
+    Returns:
+        Filtered list of table names
+    """
+    if not exclude_list.get('entries'):
+        return tables
+
+    original_count = len(tables)
+    filtered_tables = [
+        table for table in tables
+        if not should_exclude_table(schema, table, exclude_list)
+    ]
+    excluded_count = original_count - len(filtered_tables)
+
+    if excluded_count > 0:
+        logger.info(
+            f"Excluded {excluded_count} table(s) from schema '{schema}' based on exclude list. "
+            f"Remaining: {len(filtered_tables)}"
+        )
+
+    return filtered_tables
+
+
 def setup_logging() -> logging.Logger:
     logger = logging.getLogger("dlpxdlpxdbprofiler")
     logger.setLevel(logging.INFO)
@@ -677,6 +831,9 @@ def _create_connectors_for_engine(
     app_id = ce.ensure_application(app_name)
     env_id = ce.ensure_environment(app_id, env_name)
 
+    # Load exclude list once for all operations
+    exclude_list = load_exclude_list(logger)
+
     connector_scope = choose_connector_scope(logger)
 
     if db_engine == "ORACLE":
@@ -718,6 +875,18 @@ def _create_connectors_for_engine(
             schemas = [schema_name]
 
         for schema in schemas:
+            # First, check if there are any tables to profile after filtering
+            tables = oracle_db.list_tables_for_schema(schema)
+            tables = filter_tables(schema, tables, exclude_list, logger)
+
+            if not tables:
+                logger.info(
+                    f"Skipping connector/ruleset/profile creation for schema {schema} - "
+                    f"all tables were excluded by exclude list."
+                )
+                continue
+
+            # Only create connector if we have tables to profile
             connector_name = f"CONNECTOR_{schema}"
             logger.info(
                 f"Processing Oracle connector {connector_name} for schema {schema} "
@@ -768,8 +937,8 @@ def _create_connectors_for_engine(
                 )
                 continue
 
+            # Create ruleset and add tables
             ruleset_id = ce.create_ruleset(connector_id, schema)
-            tables = oracle_db.list_tables_for_schema(schema)
             ce.bulk_add_tables_to_ruleset(ruleset_id, tables)
             ce.create_profile_job(ruleset_id, schema, profile_set_id)
 
@@ -805,6 +974,18 @@ def _create_connectors_for_engine(
             schemas = [schema_name]
 
         for schema in schemas:
+            # First, check if there are any tables to profile after filtering
+            tables = mssql_db.list_tables_for_schema(schema)
+            tables = filter_tables(schema, tables, exclude_list, logger)
+
+            if not tables:
+                logger.info(
+                    f"Skipping connector/ruleset/profile creation for schema {schema} - "
+                    f"all tables were excluded by exclude list."
+                )
+                continue
+
+            # Only create connector if we have tables to profile
             connector_name = f"CONNECTOR_{schema}"
             logger.info(
                 f"Processing MSSQL connector {connector_name} for schema {schema}"
@@ -835,8 +1016,8 @@ def _create_connectors_for_engine(
                 )
                 continue
 
+            # Create ruleset and add tables
             ruleset_id = ce.create_ruleset(connector_id, schema)
-            tables = mssql_db.list_tables_for_schema(schema)
             ce.bulk_add_tables_to_ruleset(ruleset_id, tables)
             ce.create_profile_job(ruleset_id, schema, profile_set_id)
 
@@ -873,6 +1054,18 @@ def _create_connectors_for_engine(
             schemas = [schema_name]
 
         for schema in schemas:
+            # First, check if there are any tables to profile after filtering
+            tables = postgres_db.list_tables_for_schema(schema)
+            tables = filter_tables(schema, tables, exclude_list, logger)
+
+            if not tables:
+                logger.info(
+                    f"Skipping connector/ruleset/profile creation for schema {schema} - "
+                    f"all tables were excluded by exclude list."
+                )
+                continue
+
+            # Only create connector if we have tables to profile
             connector_name = f"CONNECTOR_{schema}"
             logger.info(
                 f"Processing PostgreSQL connector {connector_name} for schema {schema}"
@@ -903,8 +1096,8 @@ def _create_connectors_for_engine(
                 )
                 continue
 
+            # Create ruleset and add tables
             ruleset_id = ce.create_ruleset(connector_id, schema)
-            tables = postgres_db.list_tables_for_schema(schema)
             ce.bulk_add_tables_to_ruleset(ruleset_id, tables)
             ce.create_profile_job(ruleset_id, schema, profile_set_id)
 
@@ -932,6 +1125,17 @@ def _create_connectors_for_engine(
             )
             return
 
+        # First, check if there are any tables to profile after filtering
+        tables = filter_tables(mysql_cfg.database, tables, exclude_list, logger)
+
+        if not tables:
+            logger.info(
+                f"Skipping connector/ruleset/profile creation for database {mysql_cfg.database} - "
+                f"all tables were excluded by exclude list."
+            )
+            return
+
+        # Only create connector if we have tables to profile
         # MySQL doesn't use schemas in the same way as MSSQL/Postgres
         # We create a single connector for the database
         connector_name = f"CONNECTOR_{mysql_cfg.database}"
@@ -963,6 +1167,7 @@ def _create_connectors_for_engine(
             )
             return
 
+        # Create ruleset and add tables
         ruleset_id = ce.create_ruleset(connector_id, mysql_cfg.database)
         ce.bulk_add_tables_to_ruleset(ruleset_id, tables)
         ce.create_profile_job(ruleset_id, mysql_cfg.database, profile_set_id)
@@ -1363,6 +1568,22 @@ ENVIRONMENT VARIABLES:
         DBP_CE_PASSWORD         Password for CE
         DBP_CE_API_VERSION      API version (default: v5.1.46)
 
+    Application and Environment:
+        DBP_APPLICATION_NAME    Application name
+        DBP_ENVIRONMENT_NAME    Environment name
+        DBP_PROFILE_SET_ID      Profile set ID
+
+    Operation Selection (100% Non-Interactive Mode):
+        DBP_OPERATION           Operation to run (1-11 or descriptive name)
+                               Values: 1-11, APP, ENV, CONNECTORS, ALL,
+                               DELETE_ENV, DELETE_APP, LIST_APPS, LIST_ENVS,
+                               LIST_PROFILE_SETS, LIST_SCHEMAS, RUN_PROFILE_JOBS
+                               When set, skips menu and exits after operation
+
+    Database Engine and Scope:
+        DBP_DB_ENGINE           Database engine (ORACLE, MSSQL, POSTGRES, MYSQL)
+        DBP_CONNECTOR_SCOPE     Connector scope (SCHEMA, ALL, DB)
+
     Oracle Database (use either SID or SERVICE_NAME, not both):
         DBP_ORACLE_HOST         Oracle host
         DBP_ORACLE_PORT         Oracle port (default: 1521)
@@ -1370,6 +1591,7 @@ ENVIRONMENT VARIABLES:
         DBP_ORACLE_SERVICE_NAME Oracle Service Name (for SERVICE_NAME connection)
         DBP_ORACLE_USER         Oracle username
         DBP_ORACLE_PASSWORD     Oracle password
+        DBP_ORACLE_CONNECTOR_TYPE  Connector type (NATIVE or JDBC)
 
     MSSQL Database:
         DBP_MSSQL_HOST          MSSQL host
@@ -1377,6 +1599,21 @@ ENVIRONMENT VARIABLES:
         DBP_MSSQL_DATABASE      MSSQL database name
         DBP_MSSQL_USER          MSSQL username
         DBP_MSSQL_PASSWORD      MSSQL password
+
+    PostgreSQL Database:
+        DBP_POSTGRES_HOST       PostgreSQL host
+        DBP_POSTGRES_PORT       PostgreSQL port (default: 5432)
+        DBP_POSTGRES_DATABASE   PostgreSQL database name
+        DBP_POSTGRES_SCHEMA     PostgreSQL schema (default: public)
+        DBP_POSTGRES_USER       PostgreSQL username
+        DBP_POSTGRES_PASSWORD   PostgreSQL password
+
+    MySQL Database:
+        DBP_MYSQL_HOST          MySQL host
+        DBP_MYSQL_PORT          MySQL port (default: 3306)
+        DBP_MYSQL_DATABASE      MySQL database name
+        DBP_MYSQL_USER          MySQL username
+        DBP_MYSQL_PASSWORD      MySQL password
 
 EXAMPLES:
     # Show help
@@ -1397,6 +1634,18 @@ EXAMPLES:
     export DBP_ORACLE_USER="hr"
     export DBP_ORACLE_PASSWORD="password"
     ./dlpxdbprofiler
+
+    # Run in 100% non-interactive mode (no menu)
+    export DBP_CE_BASE_URL="http://your-mask-engine"
+    export DBP_CE_USERNAME="admin"
+    export DBP_CE_PASSWORD="password"
+    export DBP_APPLICATION_NAME="My App"
+    export DBP_ENVIRONMENT_NAME="My Env"
+    export DBP_DB_ENGINE="ORACLE"
+    export DBP_CONNECTOR_SCOPE="ALL"
+    export DBP_OPERATION="ALL"  # or use: export DBP_OPERATION=4
+    # ... other DB-specific variables ...
+    ./dlpxdbprofiler  # Executes operation and exits
 
 For more information, visit: https://github.com/delphix/dlpxdbprofiler
 """
@@ -1433,6 +1682,48 @@ def main():
 
     logger = setup_logging()
 
+    # Check for non-interactive mode via DBP_OPERATION environment variable
+    operation_choice = os.getenv("DBP_OPERATION")
+
+    if operation_choice:
+        # Non-interactive mode - run single operation and exit
+        logger.info(f"Operation loaded from environment variable DBP_OPERATION: {operation_choice}")
+
+        try:
+            if operation_choice in ["1", "APP", "APPLICATION"]:
+                op_create_application(logger)
+            elif operation_choice in ["2", "ENV", "ENVIRONMENT"]:
+                op_create_environment(logger)
+            elif operation_choice in ["3", "CONNECTORS"]:
+                op_create_connectors(logger, include_app_env_text=False)
+            elif operation_choice in ["4", "ALL"]:
+                op_create_connectors(logger, include_app_env_text=True)
+            elif operation_choice in ["5", "DELETE_ENV"]:
+                op_delete_environment(logger)
+            elif operation_choice in ["6", "DELETE_APP"]:
+                op_delete_application(logger)
+            elif operation_choice in ["7", "LIST_APPS"]:
+                op_list_applications(logger)
+            elif operation_choice in ["8", "LIST_ENVS"]:
+                op_list_environments(logger)
+            elif operation_choice in ["9", "LIST_PROFILE_SETS"]:
+                op_list_profile_sets(logger)
+            elif operation_choice in ["10", "LIST_SCHEMAS"]:
+                op_list_schemas(logger)
+            elif operation_choice in ["11", "RUN_PROFILE_JOBS"]:
+                op_run_profile_jobs(logger)
+            else:
+                logger.error(f"Invalid DBP_OPERATION value: {operation_choice}")
+                logger.error("Valid values: 1-11, APP, ENV, CONNECTORS, ALL, DELETE_ENV, DELETE_APP, "
+                           "LIST_APPS, LIST_ENVS, LIST_PROFILE_SETS, LIST_SCHEMAS, RUN_PROFILE_JOBS")
+                sys.exit(1)
+        except (CEError, OracleDBError, MSSQLDBError, PostgresDBError, MySQLDBError, ValueError) as e:
+            logger.error(f"Operation failed: {e}")
+            sys.exit(1)
+
+        # Exit after running the operation in non-interactive mode
+        sys.exit(0)
+
     # Interactive menu mode
     while True:
         print("\nSelect operation:")
@@ -1465,7 +1756,7 @@ def main():
             elif choice == "6":
                 op_delete_application(logger)
             elif choice == "7":
-                op_list_applications(logger)        # ⬅️ NEW
+                op_list_applications(logger)
             elif choice == "8":
                 op_list_environments(logger)
             elif choice == "9":

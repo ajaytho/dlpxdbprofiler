@@ -37,5 +37,18 @@ dlpxdbprofiler.log
 dlpxdbprofiler/.envrc
 dlpxdbprofiler/.python-version
 
+DBP_OPERATION_IMPLEMENTATION.md
+IMPLEMENTATION_SUMMARY.md
+SKIP_EMPTY_SCHEMA_FIX.md
+TABLE_EXCLUSION_GUIDE.md
+exclude_inventorylist.txt.example
+test_dbp_operation.sh
+SKIP_CONNECTOR_ENHANCEMENT.md
+tests/
+
 .python-version
 .envrc
+
+# Backup files
+backup/
+exclude_inventorylist.txt

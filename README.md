@@ -170,6 +170,30 @@ export DBP_PROFILE_SET_ID=4
 export DBP_PROFILE_MAX_PARALLEL=3
 ```
 
+## Operation Selection (Optional - for 100% Non-Interactive Mode)
+```
+export DBP_OPERATION=4    # or use descriptive names like "ALL"
+```
+
+Valid values:
+- **Numeric**: `1`, `2`, `3`, `4`, `5`, `6`, `7`, `8`, `9`, `10`, `11`
+- **Descriptive**: `APP`, `ENV`, `CONNECTORS`, `ALL`, `DELETE_ENV`, `DELETE_APP`, `LIST_APPS`, `LIST_ENVS`, `LIST_PROFILE_SETS`, `LIST_SCHEMAS`, `RUN_PROFILE_JOBS`
+
+Operation mapping:
+- `1` or `APP` or `APPLICATION` = Create/Ensure Application
+- `2` or `ENV` or `ENVIRONMENT` = Create/Ensure Environment
+- `3` or `CONNECTORS` = Create Connectors (+ Rulesets + Profile Jobs)
+- `4` or `ALL` = Create ALL (App + Env + Connectors + Rulesets + Profile Jobs)
+- `5` or `DELETE_ENV` = DELETE Environment
+- `6` or `DELETE_APP` = DELETE Application
+- `7` or `LIST_APPS` = LIST Applications
+- `8` or `LIST_ENVS` = LIST Environments
+- `9` or `LIST_PROFILE_SETS` = LIST Profile Sets
+- `10` or `LIST_SCHEMAS` = LIST all Schemas in database
+- `11` or `RUN_PROFILE_JOBS` = Run Profile jobs (single or all) for environment
+
+⚠️ **Note**: When `DBP_OPERATION` is set, the tool runs in **non-interactive mode**, executes the specified operation, and exits immediately. If not set, the interactive menu is displayed.
+
 ---
 
 # ▶️ Running the Utility
@@ -201,6 +225,51 @@ Select operation:
 ```
 
 You can enter options and follow prompts.
+
+## **100% Non-Interactive Mode**
+
+Set the `DBP_OPERATION` environment variable to run a specific operation without any prompts:
+
+```bash
+# Set all required environment variables
+export DBP_CE_BASE_URL="http://your-mask-engine"
+export DBP_CE_USERNAME="admin"
+export DBP_CE_PASSWORD="xxxxxx"
+export DBP_CE_API_VERSION="v5.1.46"
+
+export DBP_APPLICATION_NAME="My App"
+export DBP_ENVIRONMENT_NAME="My Env"
+export DBP_PROFILE_SET_ID=20
+
+# Oracle configuration
+export DBP_ORACLE_HOST="10.160.1.61"
+export DBP_ORACLE_PORT="1521"
+export DBP_ORACLE_SID="ORCL"
+export DBP_ORACLE_USER="delphixdb"
+export DBP_ORACLE_PASSWORD="xxxxxx"
+
+# Database engine and connector scope
+export DBP_DB_ENGINE="ORACLE"
+export DBP_CONNECTOR_SCOPE="ALL"
+export DBP_ORACLE_CONNECTOR_TYPE="NATIVE"
+
+# Operation to run (no menu will be displayed)
+export DBP_OPERATION="ALL"  # or use numeric: export DBP_OPERATION=4
+
+# Run the tool - it will execute operation 4 and exit
+./dlpxdbprofiler
+```
+
+The tool will:
+1. Skip the interactive menu
+2. Execute the specified operation
+3. Exit immediately when complete
+
+This is ideal for:
+- CI/CD pipelines
+- Automated scripts
+- Scheduled jobs
+- Docker containers
 
 ---
 
@@ -304,6 +373,123 @@ Select option: 5
 ```
 Select option: 6
 ```
+
+---
+
+# 📋 Exclude List Feature
+
+dlpxdbprofiler supports excluding specific tables from being added to rulesets using an exclude list file. This is useful for:
+- Excluding system tables
+- Skipping temporary tables
+- Avoiding sensitive tables that shouldn't be profiled
+- Filtering out backup or archive tables
+
+## Setup
+
+1. Create a file named `exclude_inventorylist.txt` in the same directory where you run dlpxdbprofiler
+2. Add table patterns to exclude (one per line)
+3. Run dlpxdbprofiler normally - it will automatically load and apply the exclusions
+
+A sample configuration file `exclude_inventorylist.txt.sample` is provided with comprehensive examples.
+
+## File Format
+
+```
+# Comments start with #
+# Empty lines are ignored
+
+# For Oracle, MSSQL, Postgres: SCHEMA.TABLE
+DELPHIXDB.EMPLOYEES
+HR.SALARY_INFO
+
+# Exclude all tables in a schema
+TEMP.*
+STAGING.*
+
+# Exclude specific table across all schemas
+*.TEMP_TABLE
+*.AUDIT_LOG
+
+# MySQL: DATABASE.TABLE or just TABLE
+mydb.users
+audit_log
+
+# Wildcards supported: * matches any characters
+DELPHIXDB.TMP_*      # Tables starting with TMP_
+*.*_BAK              # Tables ending with _BAK in any schema
+*.*TEMP*             # Tables containing TEMP in any schema
+```
+
+## Pattern Rules
+
+- **Case Sensitivity**: Patterns are case-sensitive but the matcher tries multiple case variations
+- **Wildcards**: Use `*` to match zero or more characters
+- **Schema Patterns**: 
+  - `SCHEMA.TABLE` - Exact match
+  - `SCHEMA.*` - All tables in schema
+  - `*.TABLE` - Table in any schema
+  - `*.*` - All tables (not recommended)
+- **Table-only Patterns** (MySQL): 
+  - `TABLE` - Treated as `*.TABLE`
+
+## Examples
+
+### Exclude Oracle System Schemas
+```
+SYS.*
+SYSTEM.*
+DBSNMP.*
+MDSYS.*
+```
+
+### Exclude Temporary Tables
+```
+*.TMP_*
+*.TEMP_*
+*._TEMP
+```
+
+### Exclude Backup Tables
+```
+*.*_OLD
+*.*_BACKUP
+*.*_ARCHIVE
+```
+
+## How It Works
+
+1. When dlpxdbprofiler starts connector creation, it looks for `exclude_inventorylist.txt` in the current directory
+2. If found, it loads all patterns and logs them
+3. For each schema/database being processed:
+   - Lists all tables
+   - Filters out tables matching any exclude pattern
+   - Logs how many tables were excluded
+   - **If all tables are excluded, skips connector/ruleset/profile job creation entirely for that schema**
+   - Only creates connector, ruleset, and profile job if tables remain after filtering
+   - Only adds remaining tables to the ruleset (if any remain)
+
+## Logging
+
+The tool logs exclude list operations:
+```
+2026-01-25 07:00:00 [INFO] Loading exclude list from /path/to/exclude_inventorylist.txt
+2026-01-25 07:00:00 [INFO]   Exclude pattern: TEMP.*
+2026-01-25 07:00:00 [INFO]   Exclude pattern: *.TMP_*
+2026-01-25 07:00:00 [INFO] Loaded 2 exclude pattern(s) from exclude_inventorylist.txt
+2026-01-25 07:00:01 [INFO] Excluded 5 table(s) from schema 'DELPHIXDB' based on exclude list. Remaining: 45
+```
+
+If no exclude file is found:
+```
+2026-01-25 07:00:00 [INFO] No exclude list file found at /path/to/exclude_inventorylist.txt. All tables will be included.
+```
+
+If all tables in a schema are excluded:
+```
+2026-01-25 07:00:01 [INFO] Excluded 15 table(s) from schema 'HR' based on exclude list. Remaining: 0
+2026-01-25 07:00:01 [INFO] Skipping connector/ruleset/profile creation for schema HR - all tables were excluded by exclude list.
+```
+**Note**: No connector, ruleset, or profile job is created - the schema is completely skipped.
 
 ---
 
